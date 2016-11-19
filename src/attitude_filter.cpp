@@ -32,22 +32,6 @@ double t_last = 0.0;
 double dt = 0.0;
 int counter = 0;
 
-//Defining state matrices
-Eigen::Matrix<double,15,15> A = Eigen::MatrixXd::Identity(15);
-A.segment<9,9>(0,6) = Eigen::MatrixXd::Identity(9) * dt;
-A.segment<3,3>(12,12) = Eigen::MatrixXd::Zeros(3);
-
-const Eigen::Matrix<double, 15,15> B = Eigen::Matrix<double, 15,15>::Zero(15);
-
-Eigen::Matrix<double,6,15> C = Eigen::Ma
-
-//Initialising inital state
-const Eigen::VectorXd x0 = Eigen::VectorXd::Zero(9);
-const Eigen::Vector3d init_angles(x0(3), x0(4), x0(5));
-
-//Initialising error matrices
-Eigen::MatrixXd R;
-Eigen::VectorXd Q;
 
 //Initialization for kalman Update (global: no new initialization every step)
 Eigen::Vector3d current_angles;
@@ -59,28 +43,41 @@ int main(int argc, char** argv){
 
 	ros::init(argc, argv, "attitudefilter");
 	ros::NodeHandle node;
+	
+	//Initialising state matrices
+	Eigen::Matrix<double,15,15> A = Eigen::Matrix<double,15,15>::Identity(15);
+	A.segment<9,9>(0,6) = Eigen::MatrixXd::Identity(9) * dt;
+	A.segment<3,3>(12,12) = Eigen::MatrixXd::Zeros(3);
+
+	const Eigen::Matrix<double,15,15> B = Eigen::Matrix<double,15,15>::Zero(15);
+
+	Eigen::Matrix<double,6,15> C = Eigen::Matrix<double,6,15>::Zero(6,15);
+	C.segment<3,3>(0,12) = get_rotation_matrix(init_angles);
+
+	//Initialising error matrices
+	Eigen::Matrix<double,15,15> R = Eigen::MatrixXd::Identity(15);
+	R.segment<3,3>(9,9) = Eigen::MatrixXd::Identity(3) * error_state_euler_dot;
+	R.segment<3,3>(12,12) = Eigen::MatrixXd::Identity(3) * error_state_linear_acceleration;
+
+	Eigen::Matrix<double,6,6> Q = Eigen::MatrixXd::Identity(6);
+	Q.segment<3,3>(0,0) = Eigen::MatrixXd::Identity(3) * error_measurement_linear_accelerometer;
+	Q.segment<3,3>(3,3) = Eigen::MatrixXd::Identity(3) * error_measurement_gyro;
 
 
-	C << 0*I, 0*I, 0*I, 0*I, get_rotation_matrix(init_angles),
-		0*I, 0*I, 0*I, I, 0*I;
-	R << I,0*I,0*I,0*I,0*I,
-		0*I,I,0*I,0*I,0*I,
-		0*I,0*I,I,0*I,0*I,
-		0*I,0*I,0*I,error_state_euler_dot*I,0*I,
-		0*I,0*I,0*I,0*I,error_state_linear_acceleration*I;
-	Q << error_measurement_linear_accelerometer,
-		error_measurement_linear_accelerometer,
-		error_measurement_linear_accelerometer, 
-		error_measurement_gyro, 
-		error_measurement_gyro, 
-		error_measurement_gyro;
+	//Initialising inital state
+	const Eigen::VectorXd x0 = Eigen::VectorXd::Zero(9);
+	const Eigen::Vector3d init_angles(x0(3), x0(4), x0(5));
 
 	//Initialising Kalman Filter
 	KalmanFilter kalman(A, B, C, Q, R);
 	kalman.init(x0);
 
+
 	//Subscribing & Update loop
 	while(ros::ok()){
+
+		//Defining matrices
+
 
 		imu_sub = node.subscribe("/imu0", 1, kalman_updater);
 		orientation_pub = node.advertise<geometry_msgs::Quaternion>("/current_orientation", 1);

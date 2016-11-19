@@ -9,6 +9,8 @@
 #include "geometry_msgs/Quaternion.h"
 #include "sensor_msgs/Imu.h"
 
+typedef Eigen::Matrix3d Matrix_3;
+
 
 ros::Subscriber imu_sub;
 ros::Publisher orientation_pub;
@@ -30,10 +32,14 @@ double t_last = 0.0;
 double dt = 0.0;
 int counter = 0;
 
-const Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
-Eigen::MatrixXd A;
-const Eigen::MatrixXd B = Eigen::MatrixXd::Zero(15, 15);
-Eigen::MatrixXd C;
+//Defining state matrices
+Eigen::Matrix<double,15,15> A = Eigen::MatrixXd::Identity(15);
+A.segment<9,9>(0,6) = Eigen::MatrixXd::Identity(9) * dt;
+A.segment<3,3>(12,12) = Eigen::MatrixXd::Zeros(3);
+
+const Eigen::Matrix<double, 15,15> B = Eigen::Matrix<double, 15,15>::Zero(15);
+
+Eigen::Matrix<double,6,15> C = Eigen::Ma
 
 //Initialising inital state
 const Eigen::VectorXd x0 = Eigen::VectorXd::Zero(9);
@@ -49,21 +55,12 @@ Eigen::VectorXd current_state;
 Eigen::VectorXd current_measurements;
 geometry_msgs::Quaternion current_orientation;
 
-//Initialising Kalman Filter
-KalmanFilter kalman(A, B, C, Q, R);
-
 int main(int argc, char** argv){
 
 	ros::init(argc, argv, "attitudefilter");
 	ros::NodeHandle node;
 
 
-	//Defining state matrices
-	A << I, 0*I, dt*I, 0*I, 0*I,
-		0*I, I, 0*I, dt*I, 0*I,
-		0*I, 0*I, I, 0*I, dt*I,
-		0*I, 0*I, 0*I, I, 0*I,
-		0*I, 0*I, 0*I, 0*I, 0*I;
 	C << 0*I, 0*I, 0*I, 0*I, get_rotation_matrix(init_angles),
 		0*I, 0*I, 0*I, I, 0*I;
 	R << I,0*I,0*I,0*I,0*I,
@@ -79,6 +76,7 @@ int main(int argc, char** argv){
 		error_measurement_gyro;
 
 	//Initialising Kalman Filter
+	KalmanFilter kalman(A, B, C, Q, R);
 	kalman.init(x0);
 
 	//Subscribing & Update loop

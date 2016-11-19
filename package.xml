@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package>
- 	<name>arc_attitudefilter</name>
+ 	<name>arc_state_estimation</name>
  	<version>0.0.0</version>
-  	<description>The arc_attitudefilter package</description>
+  	<description>The arc_state_estimation package</description>
 
   	<maintainer email="sele@todo.todo">sele</maintainer>
   	<license>TODO</license>

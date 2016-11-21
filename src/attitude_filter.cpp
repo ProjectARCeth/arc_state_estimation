@@ -21,6 +21,8 @@ const float error_state_linear_acceleration = 10 * 0.001;
 const float error_measurement_linear_accelerometer = 1 * 0.001;
 const float error_measurement_gyro = 0.001 * 0.001;
 
+//Updating Queue ~ Updating Frequency
+int queue_length = 200;
 
 
 //Declaration Kalman Filter
@@ -47,9 +49,9 @@ int main(int argc, char** argv){
 	//Subscribing & Update loop
 	while(ros::ok()){
 
-		imu_sub = node.subscribe("/imu0", 1, kalman_updater);
-		orientation_pub = node.advertise<geometry_msgs::Vector3>("current_euler", 10);
-		pose_pub = node.advertise<geometry_msgs::Pose>("/current_pose", 10);
+		imu_sub = node.subscribe("/imu0", queue_length, kalman_updater);
+		orientation_pub = node.advertise<geometry_msgs::Vector3>("current_euler", queue_length);
+		pose_pub = node.advertise<geometry_msgs::Pose>("/current_pose", queue_length);
 
 		ros::spinOnce();
 	}

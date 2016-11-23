@@ -13,7 +13,7 @@
   	<build_depend>std_msgs</build_depend>
 	<build_depend>geometry_msgs</build_depend>
 	<build_depend>arc_msgs</build_depend>
-	<build_depend>arc_tools</build_depend>
+	<build_depend>arc_header</build_depend>
 	<build_depend>sensor_msgs</build_depend>
 	<build_depend>catkin_simple</build_depend>
 	<build_depend>eigen_catkin</build_depend>
@@ -22,7 +22,7 @@
   	<run_depend>std_msgs</run_depend>
 	<run_depend>geometry_msgs</run_depend>
 	<run_depend>arc_msgs</run_depend>
-	<run_depend>arc_tools</run_depend>
+	<run_depend>arc_header</run_depend>
 	<run_depend>sensor_msgs</run_depend>
 	<run_depend>catkin_simple</run_depend>
 	<run_depend>eigen_catkin</run_depend>

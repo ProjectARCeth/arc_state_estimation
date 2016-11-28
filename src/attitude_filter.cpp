@@ -1,10 +1,9 @@
 #include "arc_tools/kalman_filter.hpp"
+#include "arc_tools/state_and_path_publisher.hpp"
 
 #include "yaml-cpp/yaml.h"
 
 ros::Subscriber imu_sub;
-ros::Publisher orientation_pub;
-ros::Publisher pose_pub;
 //Declaration of functions.
 void kalmanUpdater(const sensor_msgs::Imu::ConstPtr & imu_data);
 void getParameters(ros::NodeHandle* node);
@@ -15,10 +14,12 @@ double error_measurement_linear_accelerometer;
 double error_measurement_gyro;
 //Updating Queue ~ Updating Frequency.
 int queue_length;
-//Declaration Kalman Filter.
+//Initialisation of kalman and publisher class.
 KalmanFilterOrientation kalman;
+StateAndPathPublisher pub;
 
 int main(int argc, char** argv){
+	ROS_INFO("Rosparam load /($path.yaml)");
 	ros::init(argc, argv, "attitudefilter");
 	ros::NodeHandle node;		
 	//Getting parameters.
@@ -36,8 +37,6 @@ int main(int argc, char** argv){
                     error_measurement_gyro, error_measurement_linear_accelerometer);
 	//Subscribing & Update.
 	imu_sub = node.subscribe("/imu0", queue_length, kalmanUpdater);
-	orientation_pub = node.advertise<geometry_msgs::Vector3>("/current_euler", queue_length);
-	pose_pub = node.advertise<geometry_msgs::Pose>("/current_pose", queue_length);
 	ros::spin();
 	return 0;
 }
@@ -46,9 +45,8 @@ void kalmanUpdater(const sensor_msgs::Imu::ConstPtr & imuData){
 	//Updating kalman filter.
 	kalman.update(imuData);
 	//Publishing euler angles & pose.
-	orientation_pub.publish(kalman.getAngles());
-	pose_pub.publish(kalman.getPose());
-}
+	pub.publish(kalman.getState(), false);
+}	
 
 void getParameters(ros::NodeHandle* node){
 	node->getParam("/StateEstimation/ImuFilter/errorStateEulerDot", error_state_euler_dot);

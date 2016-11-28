@@ -5,7 +5,7 @@ find_package(catkin_simple 0.1.0 REQUIRED COMPONENTS
   	roscpp
     geometry_msgs
     std_msgs
-    arc_msgs
+    arc_tools
     sensor_msgs
     eigen_catkin
     catkin_simple

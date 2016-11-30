@@ -2,10 +2,10 @@ StateEstimation: {
 
   ImuFilter:{
 
-   errorStateEulerDot: 0.01,
-   errorStateLinearAcceleration: 0.01,
-   errorMeasurementLinearAccelerometer: 0.001,
-   errorMeasurementGyro: 0.0001,
+   errorStateEulerDot: 0.00001,
+   errorStateLinearAcceleration: 0.00001,
+   errorMeasurementGyro: 0.00001,
+   errorMeasurementLinearAccelerometer: 0.00001,
 
    subAndPubQueueLength: 20
    }

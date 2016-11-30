@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>	
 	
 <launch>
-  <!-- Parameter Files Orientation Kalman Filter -->
-  <arg name="imuFilter" default="$(find arc_state_estimation)/launch/state_estimation_parameter.yaml"/>
-  	
-  <!-- imuFilterNode -->
+  <!-- ImuFilterNode -->
   <node name="attitude_filter" pkg="arc_state_estimation" type="attitude_filter" output="screen">
-    <param name="imuFilter" value="$(arg imuFilter)"/>
+    <rosparam file="$(find arc_state_estimation)/launch/state_estimation_parameter.yaml"/>
   </node>
-
 </launch>
+
+

@@ -11,7 +11,7 @@ find_package(catkin_simple 0.1.0 REQUIRED COMPONENTS
     sensor_msgs
     eigen_catkin
     catkin_simple
-    yaml_cpp_catkin
+    tf
 )
 
 catkin_simple(ALL_DEPS_REQUIRED)

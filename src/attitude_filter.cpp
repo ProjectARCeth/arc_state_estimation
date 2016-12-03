@@ -1,140 +1,84 @@
-#include "arc_header/coordinate_transform.h"
-#include "arc_header/kalman_filter.h"
-
-#include <cmath>
-#include <eigen3/Eigen/Eigen>
+#include "arc_tools/coordinate_transform.hpp"
+#include "arc_tools/kalman_filter.hpp"
+#include "arc_tools/state_and_path_publisher.hpp"
 
 #include "ros/ros.h"
-#include "geometry_msgs/Vector3.h"
 #include "geometry_msgs/Quaternion.h"
-#include "sensor_msgs/Imu.h"
-
+#include <tf/transform_broadcaster.h>
 
 ros::Subscriber imu_sub;
-ros::Publisher orientation_pub;
-
-void kalman_updater(const sensor_msgs::Imu::ConstPtr & imu_data);
-
-//Earth constant
-float g =  9.80665;
-
+//Declaration of functions.
+void kalmanUpdater(const sensor_msgs::Imu::ConstPtr & imu_data);
+void getParameters(ros::NodeHandle* node);
+void tfBroadcaster(const Eigen::Vector3d euler, const Eigen::Vector3d position);
 //Definition of errors
-const float error_state_euler_dot = 40;
-const float error_state_linear_acceleration = 10;
-const float error_measurement_linear_accelerometer = 1;
-const float error_measurement_gyro = 0.001;
+double error_state_euler_dot;
+double error_state_linear_acceleration;
+double error_measurement_linear_accelerometer;
+double error_measurement_gyro;
+//Updating Queue ~ Updating Frequency.
+int queue_length = 10;
+//Initialisation of kalman and publisher class.
 
-//Time difference
-double t_current = 0.0;
-double t_last = 0.0;
-double dt = 0.0;
-int counter = 0;
-
-const Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
-Eigen::MatrixXd A;
-const Eigen::MatrixXd B = Eigen::MatrixXd::Zero(15, 15);
-Eigen::MatrixXd C;
-
-//Initialising inital state
-const Eigen::VectorXd x0 = Eigen::VectorXd::Zero(9);
-const Eigen::Vector3d init_angles(x0(3), x0(4), x0(5));
-
-//Initialising error matrices
-Eigen::MatrixXd R;
-Eigen::VectorXd Q;
-
-//Initialization for kalman Update (global: no new initialization every step)
-Eigen::Vector3d current_angles;
-Eigen::VectorXd current_state;
-Eigen::VectorXd current_measurements;
-geometry_msgs::Quaternion current_orientation;
-
-//Initialising Kalman Filter
-KalmanFilter kalman(A, B, C, Q, R);
+arc_tools::KalmanFilterOrientation kalman;
+arc_tools::StateAndPathPublisher pub;
 
 int main(int argc, char** argv){
-
 	ros::init(argc, argv, "attitudefilter");
 	ros::NodeHandle node;
-
-
-	//Defining state matrices
-	A << I, 0*I, dt*I, 0*I, 0*I,
-		0*I, I, 0*I, dt*I, 0*I,
-		0*I, 0*I, I, 0*I, dt*I,
-		0*I, 0*I, 0*I, I, 0*I,
-		0*I, 0*I, 0*I, 0*I, 0*I;
-	C << 0*I, 0*I, 0*I, 0*I, get_rotation_matrix(init_angles),
-		0*I, 0*I, 0*I, I, 0*I;
-	R << I,0*I,0*I,0*I,0*I,
-		0*I,I,0*I,0*I,0*I,
-		0*I,0*I,I,0*I,0*I,
-		0*I,0*I,0*I,error_state_euler_dot*I,0*I,
-		0*I,0*I,0*I,0*I,error_state_linear_acceleration*I;
-	Q << error_measurement_linear_accelerometer,
-		error_measurement_linear_accelerometer,
-		error_measurement_linear_accelerometer, 
-		error_measurement_gyro, 
-		error_measurement_gyro, 
-		error_measurement_gyro;
-
-	//Initialising Kalman Filter
-	kalman.init(x0);
-
-	//Subscribing & Update loop
-	while(ros::ok()){
-
-		imu_sub = node.subscribe("/imu0", 1, kalman_updater);
-		orientation_pub = node.advertise<geometry_msgs::Quaternion>("/current_orientation", 1);
-		ros::spinOnce();
-	}
-
+	pub.createPublisher(&node);
+	//Getting parameters.
+	getParameters(&node);
+	//Initialising inital state.
+	Eigen::VectorXd x_0(15);
+	x_0[0]= 0.0; x_0[1]=0.0; x_0[2]=0.0;	//Positions.
+	x_0[3]= 0.0; x_0[4]=0.0; x_0[5]=0.0;	//Euler angles.
+	x_0[6]= 0.0; x_0[7]=0.0; x_0[8]=0.0;	//Linear velocities.
+	x_0[9]= 0.0; x_0[10]=0.0; x_0[11]=0.0;	//Angular velocities.
+	x_0[12]= 0.0; x_0[13]=0.0; x_0[14]=0.0;	//Linear accelerations.
+	//Initialising Kalman Filter.
+	kalman.initWithErrors(x_0, 
+					error_state_euler_dot, error_state_linear_acceleration,
+                    error_measurement_gyro, error_measurement_linear_accelerometer);
+	//Subscribing & Update.
+	imu_sub = node.subscribe("/imu0", queue_length, kalmanUpdater);
+	ros::spin();
 	return 0;
 }
 
+void kalmanUpdater(const sensor_msgs::Imu::ConstPtr & imuData){
+	//Updating kalman filter.
+	kalman.update(imuData);
+	//Publishing euler angles & pose.
+	pub.publish(kalman.getState(), false);
+	tfBroadcaster(kalman.getState().segment<3>(3), kalman.getState().segment<3>(0));
+}	
 
-void kalman_updater(const sensor_msgs::Imu::ConstPtr & imu_data){
+void getParameters(ros::NodeHandle* node){
+	node->getParam("/attitude_filter/StateEstimation/ImuFilter/errorStateEulerDot", error_state_euler_dot);
+	node->getParam("/attitude_filter/StateEstimation/ImuFilter/errorStateLinearAcceleration", 
+		error_state_linear_acceleration);
+	node->getParam("/attitude_filter/StateEstimation/ImuFilter/errorMeasurementGyro", error_measurement_gyro);
+	node->getParam("/attitude_filter/StateEstimation/ImuFilter/errorMeasurementLinearAccelerometer", 
+		error_measurement_linear_accelerometer);
+	node->getParam("/attitude_filter/StateEstimation/ImuFilter/subAndPubQueueLength", queue_length);
 
-	if (!kalman.isinit()){ROS_INFO("Please initialize kalman first");}
-
-	//Time Interval
-	if (counter == 0){ t_last = imu_data->header.stamp.toNSec();}
-	t_current = imu_data->header.stamp.toNSec();
-	dt = pow(t_current - t_last, -9.0);											//Transforming nanoseconds into seconds
-	t_last = t_current;
-
-	//Updating matrix C
-	if (counter != 0){
-
-	C << 0*I, 0*I, 0*I, 0*I, get_rotation_matrix(current_angles),
-		0*I, 0*I, 0*I, I, 0*I;
-	}
-
-	//Getting imu-measurements
-	current_measurements << imu_data->linear_acceleration.x,
-							imu_data->linear_acceleration.y,
-							imu_data->linear_acceleration.z + g;						//Compensating external acceleration 
-																						//--> x_ is transformed, therefore g always in z-direction
-							imu_data->angular_velocity.x,
-							imu_data->angular_velocity.y,
-							imu_data->angular_velocity.z;
-
-	//Updating kalman filter
-	kalman.update(dt, C, current_measurements);
-
-	//Transforming into quaternions
-	current_state = kalman.state();
-	current_angles(0) = current_state(4);
-	current_angles(1) = current_state(5);
-	current_angles(2) = current_state(6);
-
-	current_orientation = transform_quaternion_euler(current_angles);
-	orientation_pub.publish(current_orientation);
-
-	//Counterupdate
-	counter++;
+	std::cout << "error_state_euler_dot: " << error_state_euler_dot << std::endl;
+	std::cout << "error_state_linear_acceleration: " 
+		<< error_state_linear_acceleration << std::endl;
+	std::cout << "error_measurement_gyro: " << error_measurement_gyro << std::endl;
+	std::cout << "error_measurement_linear_accelerometer: " 
+		<< error_measurement_linear_accelerometer << std::endl;
 }
 
-
-
-
+void tfBroadcaster(const Eigen::Vector3d euler, const Eigen::Vector3d position){
+  //Transform euler & position.
+  geometry_msgs::Quaternion quat = transformQuaternionEuler(euler);
+  //Set orientation and vector.
+  tf::Quaternion tf_quat(quat.x, quat.y, quat.z, quat.w);
+  tf::Vector3 tf_vector(position(0), position(1), position(2));
+  //Setting tf - broadcast.
+  static tf::TransformBroadcaster broadcaster;
+  broadcaster.sendTransform(tf::StampedTransform(
+        tf::Transform(tf_quat, tf_vector), ros::Time::now(),"world", "velodyne"));
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>	
+	
+<launch>
+  <!-- ImuFilterNode -->
+  <node name="attitude_filter" pkg="arc_state_estimation" type="attitude_filter" output="screen">
+    <rosparam file="$(find arc_state_estimation)/launch/state_estimation_parameter.yaml"/>
+  </node>
+</launch>
+
+

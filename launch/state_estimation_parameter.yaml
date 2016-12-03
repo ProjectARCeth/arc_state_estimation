@@ -1,0 +1,12 @@
+StateEstimation: {
+
+  ImuFilter:{
+
+   errorStateEulerDot: 0.0,
+   errorStateLinearAcceleration: 0.0,
+   errorMeasurementGyro: 0.0,
+   errorMeasurementLinearAccelerometer: 0.0,
+
+   subAndPubQueueLength: 20
+   }
+}

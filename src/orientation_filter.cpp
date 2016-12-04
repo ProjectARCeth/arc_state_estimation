@@ -57,15 +57,19 @@ void OrientationFilter::update(const sensor_msgs::Imu::ConstPtr& imu_data){
   // First Estimation (angle = angular_velocity_measurement * dt).
   Eigen::Vector3d omega = H_.block<3,3>(3,3)*current_measurements_.segment<3>(3);
   angle_first_estimation_ += timestep_*omega;
-  //Second estimation (gravitation orientation).
-  Eigen::Vector3d gravity_orientation = H_.block<3,3>(0,0).inverse()*current_measurements_.segment<3>(0);
-  double elementZero = x_(0)*x_(1)*x_(2)*x_(3)*x_(4)*x_(5);
-  if(elementZero <= 0.05){}
-  else{angle_second_estimation_ += gravity_orientation;}
-  //Weighting.
-  x_.segment<3>(0) = weight_*angle_first_estimation_ + (1-weight_)*angle_second_estimation_;
-  //Updating angular velocities.
-  x_.segment<3>(3) = omega;
+  x_(0) += timestep_*omega(0);
+  x_(1) += timestep_*omega(1);
+  x_(2) += timestep_*omega(2);
+
+  // //Second estimation (gravitation orientation).
+  // Eigen::Vector3d gravity_orientation = H_.block<3,3>(0,0).inverse()*current_measurements_.segment<3>(0);
+  // double elementZero = x_(0)*x_(1)*x_(2)*x_(3)*x_(4)*x_(5);
+  // if(elementZero <= 0.05){}
+  // else{angle_second_estimation_ += gravity_orientation;}
+  // //Weighting.
+  // x_.segment<3>(0) = weight_*angle_first_estimation_ + (1-weight_)*angle_second_estimation_;
+  // //Updating angular velocities.
+  // x_.segment<3>(3) = omega;
 }
 
 Eigen::VectorXd OrientationFilter::getState(){

@@ -20,6 +20,8 @@ cs_add_library(${PROJECT_NAME}
 
 cs_add_executable(state_estimation src/state_estimation.cpp)
 target_link_libraries(state_estimation ${catkin_LIBRARIES} ${PROJECT_NAME})
+cs_add_executable(orient_filter_test src/test/orient_filter_test.cpp)
+target_link_libraries(orient_filter_test ${catkin_LIBRARIES} ${PROJECT_NAME})
 
 cs_install()
 cs_export()

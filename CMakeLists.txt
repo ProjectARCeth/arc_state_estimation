@@ -18,8 +18,8 @@ cs_add_library(${PROJECT_NAME}
 	src/orientation_filter.cpp
 )
 
-cs_add_executable(attitude_filter src/attitude_filter.cpp)
-target_link_libraries(attitude_filter ${catkin_LIBRARIES} ${PROJECT_NAME})
+cs_add_executable(state_estimation src/attitude_filter.cpp)
+target_link_libraries(state_estimation ${catkin_LIBRARIES} ${PROJECT_NAME})
 
 cs_install()
 cs_export()

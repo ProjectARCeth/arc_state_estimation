@@ -1,12 +1,6 @@
 StateEstimation: {
-
-  ImuFilter:{
-
-   errorStateEulerDot: 0.0,
-   errorStateLinearAcceleration: 0.0,
-   errorMeasurementGyro: 0.0,
-   errorMeasurementLinearAccelerometer: 0.0,
-
-   subAndPubQueueLength: 20
-   }
+   weight_orientation: 0.98,
+   init_roll: 0,
+   init_pitch: 0,
+   init_yaw: 0
 }

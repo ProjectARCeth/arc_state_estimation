@@ -10,10 +10,16 @@ ros::Subscriber imu_sub;
 //Declaration of functions.
 void orientUpdater(const sensor_msgs::Imu::ConstPtr & imu_data);
 void tfBroadcaster(const Eigen::Vector3d euler, const Eigen::Vector3d position);
+void getParameters(ros::NodeHandle* node);
+//Orientation filter weight.
+double orient_filter_weight;
+//Initial conditions.
+double init_roll;
+double init_pitch;
+double init_yaw;
 //Updating Queue ~ Updating Frequency.
 int queue_length = 10;
-//Initialisation of kalman and publisher class.
-
+//Init class objects of Publisher and Filter.
 arc_state_estimation::OrientationFilter orient_filter;
 arc_tools::StateAndPathPublisher pub;
 
@@ -23,7 +29,8 @@ int main(int argc, char** argv){
 	pub.createPublisher(&node);
 	//Initialising inital state.
 	Eigen::VectorXd x_0 = Eigen::VectorXd::Zero(6,1);
-	orient_filter.initOrientationFilter(x_0);
+	x_0(0) = init_roll; x_0(1) = init_pitch; x_0(2) = init_yaw;
+	orient_filter.initOrientationFilter(x_0, orient_filter_weight);
 	//Subscribing & Update.
 	imu_sub = node.subscribe("/imu0", queue_length, orientUpdater);
 	ros::spin();
@@ -52,3 +59,10 @@ void tfBroadcaster(const Eigen::Vector3d euler, const Eigen::Vector3d position){
   broadcaster.sendTransform(tf::StampedTransform(
         tf::Transform(tf_quat, tf_vector), ros::Time::now(),"world", "velodyne"));
 }
+
+void getParameters(ros::NodeHandle* node){
+	node->getParam("/attitude_filter/StateEstimation/weight_orientation", weight);
+	node->getParam("/attitude_filter/StateEstimation/init_roll", init_roll);
+	node->getParam("/attitude_filter/StateEstimation/init_pitch", init_pitch);
+	node->getParam("/attitude_filter/StateEstimation/init_yaw", init_yaw);
+}	

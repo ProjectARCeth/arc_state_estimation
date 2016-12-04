@@ -17,7 +17,7 @@ namespace arc_state_estimation{
 class OrientationFilter{
  public:
   OrientationFilter();
-  void initOrientationFilter(const Eigen::VectorXd& x0);
+  void initOrientationFilter(const Eigen::VectorXd& x0, double weight);
   void update(const sensor_msgs::Imu::ConstPtr& imu_data);
   Eigen::VectorXd getState();
 
@@ -32,6 +32,7 @@ private:
   bool initialized_;
   double timestep_;
   arc_tools::Clock time_;
+  double weight_;
 };
 }//namespace arc_state_estimation.
 

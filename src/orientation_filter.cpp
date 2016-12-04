@@ -4,7 +4,7 @@ using namespace arc_state_estimation;
 
 OrientationFilter::OrientationFilter(){};
 
-void OrientationFilter::initOrientationFilter(const Eigen::VectorXd& x0){
+void OrientationFilter::initOrientationFilter(const Eigen::VectorXd& x0, double weight){
   //Initialising state.
   x_ = x0;
   angle_first_estimation_ = Eigen::MatrixXd::Zero(3,1);
@@ -14,6 +14,7 @@ void OrientationFilter::initOrientationFilter(const Eigen::VectorXd& x0){
   //Init time.
   time_.start();
   initialized_ = true;
+  weight_ = weight;
 }
 
 void OrientationFilter::updateMatrices(){
@@ -62,8 +63,7 @@ void OrientationFilter::update(const sensor_msgs::Imu::ConstPtr& imu_data){
   if(elementZero <= 0.05){}
   else{angle_second_estimation_ += gravity_orientation;}
   //Weighting.
-  double weight = 0.9;
-  x_.segment<3>(0) = weight*angle_first_estimation_ + (1-weight)*angle_second_estimation_;
+  x_.segment<3>(0) = weight_*angle_first_estimation_ + (1-weight_)*angle_second_estimation_;
   //Updating angular velocities.
   x_.segment<3>(3) = omega;
 }

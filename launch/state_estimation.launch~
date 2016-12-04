@@ -5,6 +5,8 @@
   <node name="attitude_filter" pkg="arc_state_estimation" type="attitude_filter" output="screen">
     <rosparam file="$(find arc_state_estimation)/launch/state_estimation_parameter.yaml"/>
   </node>
+  <node pkg="rviz" name="myrviz" type="rviz" args="home/catkin_ws/src/arc_state_estimation/launch/default.rviz" />
+	
 </launch>
 
 

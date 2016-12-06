@@ -55,7 +55,7 @@ void orientUpdater(const sensor_msgs::Imu::ConstPtr & imuData){
   test_state(0) += 0.001;
   test_state(3) += M_PI/120;
   //Publishing.
-	pub.publish(state, false);
+	pub.publishWithEuler(state.segment<3>(0),state.segment<3>(3),state.segment<3>(6),state.segment<3>(9), false);
 	tfBroadcaster(state.segment<3>(3), state.segment<3>(0));
 }	
 
@@ -70,7 +70,7 @@ void tfBroadcaster(const Eigen::Vector3d euler, const Eigen::Vector3d position){
   //Init static broadcaster.
   static tf::TransformBroadcaster broadcaster;
   //Transform euler & position.
-  geometry_msgs::Quaternion quat = transformQuaternionEuler(euler);
+  geometry_msgs::Quaternion quat = transformQuaternionEulerMsg(euler);
   //Set orientation and vector.
   tf::Quaternion tf_quat(quat.x, quat.y, quat.z, quat.w);
   tf::Vector3 tf_vector(position(0), position(1), position(2));

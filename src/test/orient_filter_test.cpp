@@ -10,7 +10,7 @@ ros::Subscriber imu_sub;
 //Declaration of functions.
 void orientUpdater(const sensor_msgs::Imu::ConstPtr & imu_data);
 void tfBroadcaster(const Eigen::Vector3d euler, const Eigen::Vector3d position);
-void getParameters(ros::NodeHandle* node);
+// void getParameters(ros::NodeHandle* node);
 //Orientation filter weight.
 double orient_filter_weight;
 //Initial conditions.
@@ -28,8 +28,8 @@ Eigen::VectorXd test_state(12);
 int main(int argc, char** argv){
 	ros::init(argc, argv, "attitudefilter");
 	ros::NodeHandle node;
-  //Getting parameters.
-  getParameters(&node);
+  // //Getting parameters.
+  // getParameters(&node);
   //Initialising publisher.
 	pub.createPublisher(&node);
   //Init test_state.
@@ -59,12 +59,12 @@ void orientUpdater(const sensor_msgs::Imu::ConstPtr & imuData){
 	tfBroadcaster(state.segment<3>(3), state.segment<3>(0));
 }	
 
-void getParameters(ros::NodeHandle* node){
-  node->getParam("/attitude_filter/StateEstimation/weight_orientation", orient_filter_weight);
-  node->getParam("/attitude_filter/StateEstimation/init_roll", init_roll);
-  node->getParam("/attitude_filter/StateEstimation/init_pitch", init_pitch);
-  node->getParam("/attitude_filter/StateEstimation/init_yaw", init_yaw);
-} 
+// void getParameters(ros::NodeHandle* node){
+//   node->getParam("/attitude_filter/StateEstimation/weight_orientation", orient_filter_weight);
+//   node->getParam("/attitude_filter/StateEstimation/init_roll", init_roll);
+//   node->getParam("/attitude_filter/StateEstimation/init_pitch", init_pitch);
+//   node->getParam("/attitude_filter/StateEstimation/init_yaw", init_yaw);
+// } 
 
 void tfBroadcaster(const Eigen::Vector3d euler, const Eigen::Vector3d position){
   //Init static broadcaster.

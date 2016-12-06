@@ -1,6 +1,3 @@
 StateEstimation: {
-   weight_orientation: 1,
-   init_roll: 0,
-   init_pitch: 0,
-   init_yaw: 0
+
 }

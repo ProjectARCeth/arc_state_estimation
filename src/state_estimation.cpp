@@ -49,11 +49,4 @@ void tfBroadcaster(Eigen::Vector4d quat, Eigen::Vector3d position){
   broadcaster.sendTransform(
       tf::StampedTransform(tf::Transform(tf_quat, tf_vector),
                            ros::Time::now(), "odom", "rear_axle"));
-  // Setting tf - broadcast from rear_axle to velodyne.
-  Eigen::Vector3d initial_vector(0.5786, 0.0, 1.0705);;
-  tf_vector = tf::Vector3(initial_vector(0), initial_vector(1), initial_vector(2));
-  tf_quat = tf::Quaternion(0,0,0,1);
-  broadcaster.sendTransform(
-      tf::StampedTransform(tf::Transform(tf_quat, tf_vector),
-                           ros::Time::now(), "rear_axle", "velodyne"));
 }

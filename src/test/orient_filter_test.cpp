@@ -70,7 +70,7 @@ void tfBroadcaster(const Eigen::Vector3d euler, const Eigen::Vector3d position){
   //Init static broadcaster.
   static tf::TransformBroadcaster broadcaster;
   //Transform euler & position.
-  geometry_msgs::Quaternion quat = transformQuaternionEulerMsg(euler);
+  geometry_msgs::Quaternion quat = arc_tools::transformQuaternionEulerMsg(euler);
   //Set orientation and vector.
   tf::Quaternion tf_quat(quat.x, quat.y, quat.z, quat.w);
   tf::Vector3 tf_vector(position(0), position(1), position(2));

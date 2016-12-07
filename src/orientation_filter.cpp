@@ -21,7 +21,7 @@ void OrientationFilter::updateMatrices(){
   //Rotation from body to global frame and Transformation matrix from 
   //rotational velocity aroud axes to euler velocities
   //(https://www.princeton.edu/~stengel/MAE331Lecture9.pdf).
-  Eigen::Matrix<double,3,3> Trafomatrix = getAngularVelocityTransformationMatrix(x_.segment<3>(0));
+  Eigen::Matrix<double,3,3> Trafomatrix = arc_tools::getAngularVelocityTransformationMatrix(x_.segment<3>(0));
   //Calculating Jacobian matrix.
   Eigen::Matrix<double,3,3>Jacobian;
   Jacobian(0,0)=0.0;Jacobian(0,1)=-cos(x_(1))*x_(4);Jacobian(0,2)=0.0;
@@ -51,7 +51,7 @@ void OrientationFilter::update(const sensor_msgs::Imu::ConstPtr& imu_data){
   double norm = sqrt(ax*ax + ay*ay + az*az);
   current_measurements_.segment<3>(0) = current_measurements_.segment<3>(0)/norm;
   //Filtering measurements.
-  current_measurements_= firstOrderLowPassIIRFilter(current_measurements_,
+  current_measurements_= arc_tools::firstOrderLowPassIIRFilter(current_measurements_,
                                                     last_measurements_, exp(-timestep_/0.5));
   last_measurements_ = current_measurements_;
   // First Estimation (angle = angular_velocity_measurement * dt).

@@ -30,10 +30,10 @@ int main(int argc, char** argv){
 
 void odomUpdater(const nav_msgs::Odometry::ConstPtr & odom_data){
 	//Publishing euler angles & pose.
-  Eigen::Vector3d position = transformPointMessageToEigen(odom_data->pose.pose.position);
-  Eigen::Vector4d quat = transformQuatMessageToEigen(odom_data->pose.pose.orientation);
-  Eigen::Vector3d lin_vel = transformVectorMessageToEigen(odom_data->twist.twist.linear);
-  Eigen::Vector3d ang_vel = transformVectorMessageToEigen(odom_data->twist.twist.angular);
+  Eigen::Vector3d position = arc_tools::transformPointMessageToEigen(odom_data->pose.pose.position);
+  Eigen::Vector4d quat = arc_tools::transformQuatMessageToEigen(odom_data->pose.pose.orientation);
+  Eigen::Vector3d lin_vel = arc_tools::transformVectorMessageToEigen(odom_data->twist.twist.linear);
+  Eigen::Vector3d ang_vel = arc_tools::transformVectorMessageToEigen(odom_data->twist.twist.angular);
   //Publishing.
 	pub.publishWithQuaternion(position, quat, lin_vel, ang_vel, false);
 	tfBroadcaster(quat, position);

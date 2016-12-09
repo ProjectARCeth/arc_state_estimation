@@ -48,5 +48,5 @@ void tfBroadcaster(Eigen::Vector4d quat, Eigen::Vector3d position){
   //Setting tf - broadcast from odom to rear_axle.
   broadcaster.sendTransform(
       tf::StampedTransform(tf::Transform(tf_quat, tf_vector),
-                           ros::Time::now(), "odom", "rear_axle"));
+                           ros::Time::now(), "odom", "rovio"));
 }

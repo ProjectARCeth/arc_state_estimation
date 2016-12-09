@@ -7,7 +7,7 @@
   <node pkg="rviz" name="myrviz" type="rviz" args="home/catkin_ws/src/arc_state_estimation/launch/default.rviz" />
 
   <!-- starting ORB_SLAM --> 
-  <node pkg="ORB_SLAM2" type="Stereo" name="Stereo" args="$(find ORB_SLAM2)/Vocabulary/ORBvoc.txt   $(find ORB_SLAM2)/cfg/ARC.yaml true" output="screen">
+  <node pkg="orb_slam2" type="stereo" name="stereo" args="$(find orb_slam2)/Vocabulary/ORBvoc.txt   $(find orb_slam2)/cfg/ARC.yaml true" output="screen">
    <remap from="/camera/left/image_raw" to="/cam0/image_raw"/>
    <remap from="/camera/right/image_raw" to="/cam1/image_raw"/>
   </node>

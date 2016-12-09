@@ -7,6 +7,7 @@
 #include <tf/transform_broadcaster.h>
 
 ros::Subscriber rovio_sub;
+ros::Subscriber orb_sub;
 //Declaration of functions.
 void odomUpdater(const nav_msgs::Odometry::ConstPtr & odom_data);
 void tfBroadcaster(const Eigen::Vector4d euler, const Eigen::Vector3d position);
@@ -23,7 +24,8 @@ int main(int argc, char** argv){
   //Initialising publisher.
 	pub.createPublisher(&node);
 	//Subscribing & Update.
-	rovio_sub = node.subscribe("rovio/odometry", queue_length, odomUpdater);
+	// rovio_sub = node.subscribe("rovio/odometry", queue_length, odomUpdater);
+  orb_sub = node.subscribe("orb_slam2/odometry", queue_length, odomUpdater);
 	ros::spin();
 	return 0;
 }
@@ -48,5 +50,5 @@ void tfBroadcaster(Eigen::Vector4d quat, Eigen::Vector3d position){
   //Setting tf - broadcast from odom to rear_axle.
   broadcaster.sendTransform(
       tf::StampedTransform(tf::Transform(tf_quat, tf_vector),
-                           ros::Time::now(), "odom", "rovio"));
+                           ros::Time::now(), "odom", "rear_axle"));
 }

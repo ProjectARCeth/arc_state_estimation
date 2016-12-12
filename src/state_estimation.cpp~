@@ -24,8 +24,8 @@ int main(int argc, char** argv){
   //Initialising publisher.
 	pub.createPublisher(&node);
 	//Subscribing & Update.
-	 rovio_sub = node.subscribe("rovio/odometry", queue_length, odomUpdater);
-  //orb_sub = node.subscribe("orb_slam2/odometry", queue_length, odomUpdater);
+	// rovio_sub = node.subscribe("rovio/odometry", queue_length, odomUpdater);
+  orb_sub = node.subscribe("orb_slam2/odometry", queue_length, odomUpdater);
 	ros::spin();
 	return 0;
 }
@@ -46,9 +46,9 @@ void tfBroadcaster(Eigen::Vector4d quat, Eigen::Vector3d position){
   static tf::TransformBroadcaster broadcaster;
   //Set orientation and vector.
   tf::Quaternion tf_quat(quat(0), quat(1), quat(2), quat(3));
-  tf::Vector3 tf_vector(position(0), position(1), position(2)+0.2);
+  tf::Vector3 tf_vector(position(0), position(1), position(2));
   //Setting tf - broadcast from odom to rear_axle.
   broadcaster.sendTransform(
       tf::StampedTransform(tf::Transform(tf_quat, tf_vector),
-                           ros::Time::now(), "odom", "vi"));
+                           ros::Time::now(), "odom", "rear_axle"));
 }

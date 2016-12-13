@@ -24,7 +24,7 @@ int main(int argc, char** argv){
   //Initialising publisher.
 	pub.createPublisher(&node);
 	//Subscribing & Update.
-	// rovio_sub = node.subscribe("rovio/odometry", queue_length, odomUpdater);
+	rovio_sub = node.subscribe("rovio/odometry", queue_length, odomUpdater);
   orb_sub = node.subscribe("orb_slam2/odometry", queue_length, odomUpdater);
 	ros::spin();
 	return 0;

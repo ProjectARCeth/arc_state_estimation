@@ -14,15 +14,16 @@
   </node>
 	
   <!-- starting ORB_SLAM --> 
-  <node pkg="ORB_SLAM2" type="Stereo" name="Stereo" args="$(find ORB_SLAM2)/Vocabulary/ORBvoc.txt   $(find ORB_SLAM2)/cfg/ARC.yaml true" output="screen">
+  <node pkg="orb_slam2" type="stereo" name="stereo" args="$(find orb_slam2)/Vocabulary/ORBvoc.txt   $(find orb_slam2)/cfg/ARC.yaml true" output="screen">
    <remap from="/camera/left/image_raw" to="/cam0/image_raw"/>
    <remap from="/camera/right/image_raw" to="/cam1/image_raw"/>
   </node>
 
   <!-- transform (rear_axle to velodyne) publisher node (needed for periodic assembler) --> 
-  <node pkg="tf" type="static_transform_publisher" name="rear_axes_to_velodyne_broadcaster" args="0.5786 0.0 1.0705 0.0 0.0 0.0 1.0 rovio velodyne 100" /> 
+  <node pkg="tf" type="static_transform_publisher" name="rear_axes_to_velodyne_broadcaster" args="0.5786 0.0 1.0705 0.0 0.0 0.0 1.0 rear_axle velodyne 100" /> 
   <!-- path frame --> 
-  <node pkg="tf" type="static_transform_publisher" name="path" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 odom path 100" />
+  <node pkg="tf" type="static_transform_publisher" name="path_rovio" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 odom path_rovio 100" />
+  <node pkg="tf" type="static_transform_publisher" name="path_orb" args="0.0 0.0 0.0 0.0 0.7071 -0.7071 0.0 odom path_orb 100" />
 	
 </launch>
 

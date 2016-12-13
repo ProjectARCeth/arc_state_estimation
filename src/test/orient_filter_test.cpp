@@ -21,7 +21,7 @@ double init_yaw;
 int queue_length = 10;
 //Init class objects of Publisher and Filter.
 arc_state_estimation::OrientationFilter orient_filter;
-arc_tools::StateAndPathPublisher pub;
+arc_tools::StateAndPathPublisher pub("path");
 //Teststate.
 Eigen::VectorXd test_state(12);
 

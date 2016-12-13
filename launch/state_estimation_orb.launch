@@ -15,7 +15,7 @@
   <!-- transform (rear_axle to velodyne) publisher node (needed for periodic assembler) --> 
   <node pkg="tf" type="static_transform_publisher" name="rear_axes_to_velodyne_broadcaster" args="0.5786 0.0 1.0705 0.0 0.0 0.0 1.0 rear_axle velodyne 100" /> 
   <!-- path frame --> 
-  <node pkg="tf" type="static_transform_publisher" name="path" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 odom path 100" />
+  <node pkg="tf" type="static_transform_publisher" name="path" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 odom path_orb 100" />
 	
 </launch>
 

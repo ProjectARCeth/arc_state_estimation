@@ -10,10 +10,20 @@
 namespace arc_state_estimation{
 
 class StateEstimation{
-private:
-  
 public:
-  
+  //Constructor.
+  StateEstimation();
+  //Position.
+  void updateOrbslam(Eigen::Vector3d pos);
+  void updateSegmatch(Eigen::Vector3d pos);
+  void updateGPS(Eigen::Vector3d pos);
+  //Linear velocity, angular velocity, orientation.
+  void updateRovio(Eigen::Vector<double,10> measurements);
+  //Velocity.
+  void updateWheelSensor(double vel);
+
+private:
+
 };
 }//namespace arc_state_estimation.
 

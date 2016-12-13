@@ -12,18 +12,24 @@
    <param name="camera0_config" value="$(find rovio)/cfg/rovio_cam0.yaml"/>
    <param name="camera1_config" value="$(find rovio)/cfg/rovio_cam1.yaml"/>
   </node>
+  <!-- transform (VI to velodyne) publisher node (needed for periodic assembler) --> 
+  <node pkg="tf" type="static_transform_publisher" name="vi_to_velodyne_broadcaster" args="0.0 0.9 -1.0 0.5 0.5 0.5 -0.5 rovio velodyne 100" /> 
+  <!-- transform (velodyne to rear_axle) publisher node (needed for periodic assembler) --> 
+  <node pkg="tf" type="static_transform_publisher" name="velodyne_to_rear_axle_broadcaster" args="-0.5786 0.0 -1.0705 0.0 0.0 0.0 1.0 velodyne rear_axle 100" /> 
 	
   <!-- starting ORB_SLAM --> 
   <node pkg="orb_slam2" type="stereo" name="stereo" args="$(find orb_slam2)/Vocabulary/ORBvoc.txt   $(find orb_slam2)/cfg/ARC.yaml true" output="screen">
    <remap from="/camera/left/image_raw" to="/cam0/image_raw"/>
    <remap from="/camera/right/image_raw" to="/cam1/image_raw"/>
   </node>
+  <!-- transforming -->
+  <node pkg="tf" type="static_transform_publisher" name="rotating_orb" args="0.0 0.9 -1.0 0.0 0.7071 -0.7071 0.0 orb velodyne 100" />
 
   <!-- transform (rear_axle to velodyne) publisher node (needed for periodic assembler) --> 
   <node pkg="tf" type="static_transform_publisher" name="rear_axes_to_velodyne_broadcaster" args="0.5786 0.0 1.0705 0.0 0.0 0.0 1.0 rear_axle velodyne 100" /> 
   <!-- path frame --> 
   <node pkg="tf" type="static_transform_publisher" name="path_rovio" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 odom path_rovio 100" />
-  <node pkg="tf" type="static_transform_publisher" name="path_orb" args="0.0 0.0 0.0 0.0 0.7071 -0.7071 0.0 odom path_orb 100" />
+  <node pkg="tf" type="static_transform_publisher" name="path_orb" args="0.0 0.0 0.0 0.0 0.0 0.0 1.0 odom path_orb 100" />
 	
 </launch>
 

@@ -42,7 +42,7 @@ void odomUpdaterRovio(const nav_msgs::Odometry::ConstPtr & odom_data){
   Eigen::Vector3d ang_vel = arc_tools::transformVectorMessageToEigen(odom_data->twist.twist.angular);
   //Publishing.
 	pub_rovio.publishWithQuaternion(position, quat, lin_vel, ang_vel, false);
-	tfBroadcaster(quat, position);
+	tfBroadcaster(quat, position, "rovio");
 }	
 
 void odomUpdaterOrb(const nav_msgs::Odometry::ConstPtr & odom_data){
@@ -53,10 +53,10 @@ void odomUpdaterOrb(const nav_msgs::Odometry::ConstPtr & odom_data){
   Eigen::Vector3d ang_vel = arc_tools::transformVectorMessageToEigen(odom_data->twist.twist.angular);
   //Publishing.
   pub_orb.publishWithQuaternion(position, quat, lin_vel, ang_vel, false);
-  tfBroadcaster(quat, position);
+  tfBroadcaster(quat, position, "orb");
 } 
 
-void tfBroadcaster(Eigen::Vector4d quat, Eigen::Vector3d position){
+void tfBroadcaster(Eigen::Vector4d quat, Eigen::Vector3d position, std::string tf_name){
   // Init static broadcaster.
   static tf::TransformBroadcaster broadcaster;
   //Set orientation and vector.
@@ -65,5 +65,5 @@ void tfBroadcaster(Eigen::Vector4d quat, Eigen::Vector3d position){
   //Setting tf - broadcast from odom to rear_axle.
   broadcaster.sendTransform(
       tf::StampedTransform(tf::Transform(tf_quat, tf_vector),
-                           ros::Time::now(), "odom", "vi"));
+                           ros::Time::now(), "odom", tf_name));
 }

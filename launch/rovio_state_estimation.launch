@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>	
 	
 <launch>
-
+	
   <node name="state_estimation" pkg="arc_state_estimation" type="state_estimation" output="screen"/>
 
   <node pkg="rviz" name="myrviz" type="rviz" args="home/catkin_ws/src/arc_state_estimation/launch/default.rviz" />
@@ -14,7 +14,7 @@
   </node>
 
   <!-- transform (VI to velodyne) publisher node (needed for periodic assembler) --> 
-  <node pkg="tf" type="static_transform_publisher" name="vi_to_velodyne_broadcaster" args="0.0 0.9 -1.0 0.5 0.5 0.5 -0.5 vi velodyne 100" /> 
+  <node pkg="tf" type="static_transform_publisher" name="rovio_to_velodyne_broadcaster" args="0.0 0.9 -1.0 0.5 0.5 0.5 -0.5 rovio velodyne 100" /> 
  <!-- transform (velodyne to rear_axle) publisher node (needed for periodic assembler) --> 
   <node pkg="tf" type="static_transform_publisher" name="velodyne_to_rear_axle_broadcaster" args="-0.5786 0.0 -1.0705 0.0 0.0 0.0 1.0 velodyne rear_axle 100" /> 
   <!-- path frame --> 

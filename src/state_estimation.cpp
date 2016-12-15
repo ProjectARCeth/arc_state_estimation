@@ -12,14 +12,12 @@ ros::Subscriber orb_sub;
 //Declaration of functions.
 void odomUpdaterRovio(const nav_msgs::Odometry::ConstPtr & odom_data);
 void odomUpdaterOrb(const nav_msgs::Odometry::ConstPtr & odom_data);
-void tfBroadcaster(const Eigen::Vector4d euler, const Eigen::Vector3d position);
+void tfBroadcaster(const Eigen::Vector4d euler, const Eigen::Vector3d position, std::string tf_name);
 //Updating Queue ~ Updating Frequency.
 int queue_length = 10;
 //Init class objects of Publisher and Filter.
-arc_tools::StateAndPathPublisher pub_orb("path_orb");
-arc_tools::StateAndPathPublisher pub_rovio("path_rovio");
-//Teststate.
-Eigen::VectorXd test_state(12);
+arc_tools::StateAndPathPublisher pub_orb("path_orb", "pathOrb");
+arc_tools::StateAndPathPublisher pub_rovio("path_rovio", "pathRov");
 
 int main(int argc, char** argv){
 	ros::init(argc, argv, "arc_state_estimation");

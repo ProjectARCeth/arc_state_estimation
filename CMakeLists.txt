@@ -14,14 +14,8 @@ find_package(catkin_simple 0.1.0 REQUIRED COMPONENTS
 
 catkin_simple(ALL_DEPS_REQUIRED)
 
-cs_add_library(${PROJECT_NAME} 
-	src/orientation_filter.cpp
-)
-
 cs_add_executable(state_estimation src/state_estimation.cpp)
-target_link_libraries(state_estimation ${catkin_LIBRARIES} ${PROJECT_NAME})
-cs_add_executable(orient_filter_test src/test/orient_filter_test.cpp)
-target_link_libraries(orient_filter_test ${catkin_LIBRARIES} ${PROJECT_NAME})
+target_link_libraries(state_estimation ${catkin_LIBRARIES})
 
 cs_install()
 cs_export()

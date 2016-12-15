@@ -4,15 +4,19 @@
 #include <iostream>
 #include "ros/ros.h"
 #include "geometry_msgs/Quaternion.h"
+#include "geometry_msgs/Transform.h"
 #include "nav_msgs/Odometry.h"
 #include <tf/transform_broadcaster.h>
+#include <tf/transform_listener.h>
 
 ros::Subscriber rovio_sub;
 ros::Subscriber orb_sub;
+ros::Publisher velodyne_pub;
 //Declaration of functions.
 void odomUpdaterRovio(const nav_msgs::Odometry::ConstPtr & odom_data);
 void odomUpdaterOrb(const nav_msgs::Odometry::ConstPtr & odom_data);
 void tfBroadcaster(const Eigen::Vector4d euler, const Eigen::Vector3d position, std::string tf_name);
+void tfListener(std::string tf_name);
 //Updating Queue ~ Updating Frequency.
 int queue_length = 10;
 //Init class objects of Publisher and Filter.
@@ -28,6 +32,7 @@ int main(int argc, char** argv){
 	//Subscribing & Update.
 	rovio_sub = node.subscribe("rovio/odometry", queue_length, odomUpdaterRovio);
   orb_sub = node.subscribe("orb_slam2/odometry", queue_length, odomUpdaterOrb);
+  velodyne_pub = node.advertise<geometry_msgs::Transform>("/velodyne/odom", queue_length);
 	ros::spin();
 	return 0;
 }
@@ -41,6 +46,7 @@ void odomUpdaterRovio(const nav_msgs::Odometry::ConstPtr & odom_data){
   //Publishing.
 	pub_rovio.publishWithQuaternion(position, quat, lin_vel, ang_vel, false);
 	tfBroadcaster(quat, position, "rovio");
+  tfListener("velodyne");
 }	
 
 void odomUpdaterOrb(const nav_msgs::Odometry::ConstPtr & odom_data){
@@ -52,6 +58,7 @@ void odomUpdaterOrb(const nav_msgs::Odometry::ConstPtr & odom_data){
   //Publishing.
   pub_orb.publishWithQuaternion(position, quat, lin_vel, ang_vel, false);
   tfBroadcaster(quat, position, "orb");
+  tfListener("velodyne");
 } 
 
 void tfBroadcaster(Eigen::Vector4d quat, Eigen::Vector3d position, std::string tf_name){
@@ -64,4 +71,23 @@ void tfBroadcaster(Eigen::Vector4d quat, Eigen::Vector3d position, std::string t
   broadcaster.sendTransform(
       tf::StampedTransform(tf::Transform(tf_quat, tf_vector),
                            ros::Time::now(), "odom", tf_name));
+}
+
+void tfListener(std::string tf_name){
+  //Init static listener.
+  static tf::TransformListener listener;
+  //Listening.
+  tf::StampedTransform tf_transform;
+  try{listener.lookupTransform("odom", tf_name, ros::Time(0), tf_transform);}
+  catch(tf::TransformException &ex){}
+  //Publishing transformation.
+  geometry_msgs::Transform transform;
+  transform.translation.x = tf_transform.getOrigin().x();
+  transform.translation.y = tf_transform.getOrigin().y();
+  transform.translation.z = tf_transform.getOrigin().z();
+  transform.rotation.x = tf_transform.getRotation().x();
+  transform.rotation.y = tf_transform.getRotation().y();
+  transform.rotation.z = tf_transform.getRotation().z();
+  transform.rotation.w = tf_transform.getRotation().w();
+  velodyne_pub.publish(transform);
 }

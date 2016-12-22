@@ -11,6 +11,7 @@
 
 ros::Subscriber orb_sub;
 ros::Publisher velodyne_pub;
+ros::Publisher rear_axle_pub;
 //Declaration of functions.
 void odomUpdaterOrb(const nav_msgs::Odometry::ConstPtr & odom_data);
 void tfBroadcaster(const Eigen::Vector4d euler, const Eigen::Vector3d position, std::string tf_name);
@@ -40,7 +41,7 @@ void odomUpdaterOrb(const nav_msgs::Odometry::ConstPtr & odom_data){
   Eigen::Vector3d lin_vel = arc_tools::transformVectorMessageToEigen(odom_data->twist.twist.linear);
   Eigen::Vector3d ang_vel = arc_tools::transformVectorMessageToEigen(odom_data->twist.twist.angular);
   //Publishing.
-  pub_orb.publishWithQuaternion(position, quat, lin_vel, ang_vel, false);
+  pub_state.publishWithQuaternion(position, quat, lin_vel, ang_vel, false);
   tfBroadcaster(quat, position, "vi");
   tfListener("velodyne");
   tfListener("rear_axle");

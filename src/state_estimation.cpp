@@ -9,45 +9,29 @@
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 
-ros::Subscriber rovio_sub;
 ros::Subscriber orb_sub;
 ros::Publisher velodyne_pub;
 //Declaration of functions.
-void odomUpdaterRovio(const nav_msgs::Odometry::ConstPtr & odom_data);
 void odomUpdaterOrb(const nav_msgs::Odometry::ConstPtr & odom_data);
 void tfBroadcaster(const Eigen::Vector4d euler, const Eigen::Vector3d position, std::string tf_name);
 void tfListener(std::string tf_name);
 //Updating Queue ~ Updating Frequency.
 int queue_length = 10;
 //Init class objects of Publisher and Filter.
-arc_tools::StateAndPathPublisher pub_orb("path_orb", "pathOrb");
-arc_tools::StateAndPathPublisher pub_rovio("path_rovio", "pathRov");
+arc_tools::StateAndPathPublisher pub_state("path", "path");
 
 int main(int argc, char** argv){
 	ros::init(argc, argv, "arc_state_estimation");
 	ros::NodeHandle node;
   //Initialising publisher.
-	pub_orb.createPublisher(&node);
-  pub_rovio.createPublisher(&node);
+	pub_state.createPublisher(&node);
 	//Subscribing & Update.
-	rovio_sub = node.subscribe("rovio/odometry", queue_length, odomUpdaterRovio);
   orb_sub = node.subscribe("orb_slam2/odometry", queue_length, odomUpdaterOrb);
+  rear_axle_pub = node.advertise<geometry_msgs::Transform>("/rear_axle/odom", queue_length);
   velodyne_pub = node.advertise<geometry_msgs::Transform>("/velodyne/odom", queue_length);
 	ros::spin();
 	return 0;
 }
-
-void odomUpdaterRovio(const nav_msgs::Odometry::ConstPtr & odom_data){
-	//Publishing euler angles & pose.
-  Eigen::Vector3d position = arc_tools::transformPointMessageToEigen(odom_data->pose.pose.position);
-  Eigen::Vector4d quat = arc_tools::transformQuatMessageToEigen(odom_data->pose.pose.orientation);
-  Eigen::Vector3d lin_vel = arc_tools::transformVectorMessageToEigen(odom_data->twist.twist.linear);
-  Eigen::Vector3d ang_vel = arc_tools::transformVectorMessageToEigen(odom_data->twist.twist.angular);
-  //Publishing.
-	pub_rovio.publishWithQuaternion(position, quat, lin_vel, ang_vel, false);
-	tfBroadcaster(quat, position, "rovio");
-  tfListener("velodyne");
-}	
 
 void odomUpdaterOrb(const nav_msgs::Odometry::ConstPtr & odom_data){
   //Publishing euler angles & pose.
@@ -57,8 +41,9 @@ void odomUpdaterOrb(const nav_msgs::Odometry::ConstPtr & odom_data){
   Eigen::Vector3d ang_vel = arc_tools::transformVectorMessageToEigen(odom_data->twist.twist.angular);
   //Publishing.
   pub_orb.publishWithQuaternion(position, quat, lin_vel, ang_vel, false);
-  tfBroadcaster(quat, position, "orb");
+  tfBroadcaster(quat, position, "vi");
   tfListener("velodyne");
+  tfListener("rear_axle");
 } 
 
 void tfBroadcaster(Eigen::Vector4d quat, Eigen::Vector3d position, std::string tf_name){

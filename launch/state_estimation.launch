@@ -7,7 +7,7 @@
   <node pkg="rviz" name="myrviz" type="rviz" args="home/catkin_ws/src/arc_state_estimation/launch/default.rviz" />
 
   <!-- starting GPS -->
-  <node name="$(arg gps)" pkg="ublox_gps" type="ublox_gps" output="$(arg output)">
+  <node name="gps" pkg="ublox_gps" type="ublox_gps" output="screen">
    <param name="device" type="string" value="/dev/ttyACM0"/>
    <param name="frame_id" type="string" value="gps"/>
    <param name="baudrate" type="int" value="57600"/>

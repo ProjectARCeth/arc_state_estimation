@@ -27,7 +27,7 @@ int main(int argc, char** argv){
   //Initialising publisher.
 	pub_state.createPublisher(&node);
 	//Subscribing & Update.
-  orb_sub = node.subscribe("orb_slam2/odometry", queue_length, odomUpdaterOrb);
+  orb_sub = node.subscribe("rovio/odometry", queue_length, odomUpdaterOrb);
   rear_axle_pub = node.advertise<geometry_msgs::Transform>("/rear_axle/odom", queue_length);
   velodyne_pub = node.advertise<geometry_msgs::Transform>("/velodyne/odom", queue_length);
 	ros::spin();

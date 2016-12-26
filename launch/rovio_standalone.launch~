@@ -20,7 +20,6 @@
    <param name="enable_glonass" type="bool" value="false"/>
    <param name="enable_ppp" type="bool" value="false"/>
    <param name="ublox_version" type="int" value="8"/>
-   <param name="initializing_samples" type="int" value="50"/>
   </node>
 	
   <!-- starting Rovio -->
@@ -29,9 +28,6 @@
    <param name="camera0_config" value="$(find rovio)/cfg/rovio_cam0.yaml"/>
    <param name="camera1_config" value="$(find rovio)/cfg/rovio_cam1.yaml"/>
   </node>
-
-  <!-- starting ORB_SLAM --> 
-  <node pkg="orb_slam2" type="stereo" name="stereo" args="$(find orb_slam2)/Vocabulary/ORBvoc.txt   $(find orb_slam2)/cfg/ARC.yaml true" output="screen" />
 
   <!-- transform (VI to velodyne) publisher node (needed for periodic assembler) --> 
   <node pkg="tf" type="static_transform_publisher" name="rovio_to_velodyne_broadcaster" args="0.0 0.9 -1.0 0.5 0.5 0.5 -0.5 vi velodyne 100" /> 

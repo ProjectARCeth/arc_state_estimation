@@ -14,8 +14,12 @@ find_package(catkin_simple 0.1.0 REQUIRED COMPONENTS
 
 catkin_simple(ALL_DEPS_REQUIRED)
 
+cs_add_library(${PROJECT_NAME} 
+    src/state_and_path_publisher.cpp
+)
+
 cs_add_executable(state_estimation src/state_estimation.cpp)
-target_link_libraries(state_estimation ${catkin_LIBRARIES})
+target_link_libraries(state_estimation ${catkin_LIBRARIES}  ${PROJECT_NAME})
 
 cs_install()
 cs_export()

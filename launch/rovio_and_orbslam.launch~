@@ -6,23 +6,6 @@
 
   <node pkg="rviz" name="myrviz" type="rviz" args="home/catkin_ws/src/arc_state_estimation/launch/default.rviz" />
 	
-  <!-- starting GPS -->
-  <node name="gps" pkg="ublox_gps" type="ublox_gps" output="screen">
-   <param name="device" type="string" value="/dev/ttyACM0"/>
-   <param name="frame_id" type="string" value="gps"/>
-   <param name="baudrate" type="int" value="57600"/>
-   <param name="rate" type="int" value="10"/>
-   <param name="enable_sbas" type="bool" value="false"/>
-   <param name="dynamic_model" type="string" value="portable"/>
-   <param name="fix_mode" type="string" value="both"/>
-   <param name="dr_limit" type="int" value="0"/>
-   <param name="enable_beidou" type="bool" value="false"/>
-   <param name="enable_glonass" type="bool" value="false"/>
-   <param name="enable_ppp" type="bool" value="false"/>
-   <param name="ublox_version" type="int" value="8"/>
-   <param name="initializing_samples" type="int" value="50"/>
-  </node>
-	
   <!-- starting Rovio -->
   <node pkg="rovio" type="rovio_node" name="rovio" output="screen">
    <param name="filter_config" value="$(find rovio)/cfg/rovio_test.info"/>
@@ -30,8 +13,11 @@
    <param name="camera1_config" value="$(find rovio)/cfg/rovio_cam1.yaml"/>
   </node>
 
-  <!-- starting ORB_SLAM --> 
-  <node pkg="orb_slam2" type="stereo" name="stereo" args="$(find orb_slam2)/Vocabulary/ORBvoc.txt   $(find orb_slam2)/cfg/ARC.yaml true" output="screen" />
+  <!-- starting ORB_SLAM (VOC-PATH CFG-PATH USE-VIEWER REUSE-OLD-MAP NEW-MAP-PATH OLD-MAP-PATH)--> 
+  <node pkg="orb_slam2" type="stereo" name="stereo" args="$(find orb_slam2)/Vocabulary/ORBvoc.txt   $(find orb_slam2)/cfg/ARC.yaml true false latest_map.bin old_map.bin" output="screen" >
+  <remap from="/camera/left/image_raw" to="/cam0/image_raw"/>
+  <remap from="/camera/right/image_raw" to="/cam1/image_raw"/>
+  </node>
 
   <!-- transform (VI to velodyne) publisher node (needed for periodic assembler) --> 
   <node pkg="tf" type="static_transform_publisher" name="rovio_to_velodyne_broadcaster" args="0.0 0.9 -1.0 0.5 0.5 0.5 -0.5 vi velodyne 100" /> 

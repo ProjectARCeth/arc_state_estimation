@@ -23,9 +23,9 @@ float LENGTH_WHEEL_AXIS = 1.6; //[m]
 int QUEUE_LENGTH = 10;  //Updating queue ~ frequency.
 float CURRENT_ARRAY_SEARCHING_WIDTH = 4.0; //[m]
 float CURRENT_ARRAY_MAXIMAL_WIDTH = 100.0; //[m]
-std::string LAST_PATH_FILENAME = "last_path_file";
-std::string CURRENT_PATH_FILENAME = "path_file";
-std::string TEACH_REPEAT = "teach";
+std::string LAST_PATH_FILENAME;
+std::string CURRENT_PATH_FILENAME;
+std::string TEACH_REPEAT;
 //TODO: Konstanten als argv oder in yaml file.
 //Subcriber and publisher.
 ros::Subscriber left_wheel_sub;
@@ -48,7 +48,6 @@ bool mode;
 //Declaration of functions.
 double calculate_distance(geometry_msgs::Pose base, geometry_msgs::Pose target);
 void close_state_estimation();
-geometry_msgs::Pose getPose(nav_msgs::Path path, int index);
 void init_state_estimation(ros::NodeHandle* node);
 void odomUpdater();
 void orbslam_sub(const nav_msgs::Odometry::ConstPtr & odom_data);
@@ -62,6 +61,11 @@ void velocity_right_sub(const std_msgs::Float64::ConstPtr& msg);
 arc_state_estimation::CarModel car_model(DISTANCE_WHEEL_AXES, LENGTH_WHEEL_AXIS);
 
 int main(int argc, char** argv){
+  //Setting input arguments.
+  TEACH_REPEAT = std::string(argv[0]);
+  CURRENT_PATH_FILENAME = std::string(argv[1]);
+  LAST_PATH_FILENAME = std::string(argv[2]);
+  //Init ROS.
 	ros::init(argc, argv, "arc_state_estimation");
 	ros::NodeHandle node;
   //Initialising.
@@ -108,7 +112,6 @@ void close_state_estimation(){
   //Finishing ros.
   ros::shutdown();
 }
-
 
 void rovio_sub(const nav_msgs::Odometry::ConstPtr & odom_data){
   //If teach the take position out of rovio, orientation and velocity always from rovio.
@@ -248,12 +251,3 @@ double calculate_distance(geometry_msgs::Pose base, geometry_msgs::Pose target){
                         (y_base-y_target)*(y_base-y_target) + (z_base-z_target)*(z_base-z_target));
   return distance;
 }
-
-geometry_msgs::Pose getPose(nav_msgs::Path path, int index){
-  geometry_msgs::Pose pose;
-  pose.position.x = path.poses[index].pose.position.x;
-  pose.position.y = path.poses[index].pose.position.y;
-  pose.position.z = path.poses[index].pose.position.z;
-  return pose;
-}
-

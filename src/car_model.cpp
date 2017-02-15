@@ -9,7 +9,7 @@ CarModel::CarModel(float distance_wheels, float length_axis){
 }
 
 void CarModel::createPublisher(ros::NodeHandle* node){
-    pub_velocity_ = node->advertise<geometry_msgs::Transform>("car_model_velocity", 10);
+    pub_velocity_ = node->advertise<geometry_msgs::TwistWithCovarianceStamped>("car_model_velocity", 10);
 }
 
 void CarModel::updateModel(Eigen::Vector4d orientation){
@@ -26,19 +26,16 @@ void CarModel::updateModel(Eigen::Vector4d orientation){
     float omega = sin(steering_angle_) / B_;
     //Velocities in local frame.
     Eigen::Vector3d velocity_local(v_back, 0, 0);
-    Eigen::Vector3d omega_local(0, 0, omega);
     //Convert to global frame.
     Eigen::Vector3d orientation_euler = arc_tools::transformEulerQuaternionVector(orientation);
     Eigen::Matrix3d rotation_matrix = arc_tools::getRotationMatrix(orientation_euler);
     Eigen::Vector3d v_global = rotation_matrix * velocity_local; 
-    Eigen::Vector3d omega_global = rotation_matrix * omega_local;
     //Publishing.
-    geometry_msgs::Transform transformation;
-    transformation.translation.x = v_global(0);
-    transformation.translation.y = v_global(1);
-    transformation.translation.z = v_global(2);
-    transformation.rotation = arc_tools::transformQuaternionEulerMsg(omega_global);
-    pub_velocity_.publish(transformation);
+    geometry_msgs::TwistWithCovarianceStamped twist;
+    twist.twist.twist.linear.x = v_global(0);
+    twist.twist.twist.linear.y  = v_global(1);
+    twist.twist.twist.linear.z  = v_global(2);
+    pub_velocity_.publish(twist);
 }
 
 void CarModel::set_steering_angle(float steering_angle){steering_angle_ = steering_angle;}

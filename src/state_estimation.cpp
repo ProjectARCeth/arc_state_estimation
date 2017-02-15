@@ -1,5 +1,5 @@
 #include "arc_tools/coordinate_transform.hpp"
-#include "arc_tools/state_and_path_publisher.hpp"
+#include "arc_state_estimation/state_and_path_publisher.hpp"
 
 #include <iostream>
 #include "ros/ros.h"
@@ -15,11 +15,10 @@ ros::Publisher rear_axle_pub;
 //Declaration of functions.
 void odomUpdaterOrb(const nav_msgs::Odometry::ConstPtr & odom_data);
 void tfBroadcaster(const Eigen::Vector4d euler, const Eigen::Vector3d position, std::string tf_name);
-void tfListener(std::string tf_name);
 //Updating Queue ~ Updating Frequency.
 int queue_length = 10;
 //Init class objects of Publisher and Filter.
-arc_tools::StateAndPathPublisher pub_state("path", "path");
+arc_state_estimation::StateAndPathPublisher pub_state("path", "path");
 
 int main(int argc, char** argv){
 	ros::init(argc, argv, "arc_state_estimation");
@@ -43,8 +42,6 @@ void odomUpdaterOrb(const nav_msgs::Odometry::ConstPtr & odom_data){
   //Publishing.
   pub_state.publishWithQuaternion(position, quat, lin_vel, ang_vel, false);
   tfBroadcaster(quat, position, "vi");
-  tfListener("velodyne");
-  tfListener("rear_axle");
 } 
 
 void tfBroadcaster(Eigen::Vector4d quat, Eigen::Vector3d position, std::string tf_name){
@@ -57,23 +54,4 @@ void tfBroadcaster(Eigen::Vector4d quat, Eigen::Vector3d position, std::string t
   broadcaster.sendTransform(
       tf::StampedTransform(tf::Transform(tf_quat, tf_vector),
                            ros::Time::now(), "odom", tf_name));
-}
-
-void tfListener(std::string tf_name){
-  //Init static listener.
-  static tf::TransformListener listener;
-  //Listening.
-  tf::StampedTransform tf_transform;
-  try{listener.lookupTransform("odom", tf_name, ros::Time(0), tf_transform);}
-  catch(tf::TransformException &ex){}
-  //Publishing transformation.
-  geometry_msgs::Transform transform;
-  transform.translation.x = tf_transform.getOrigin().x();
-  transform.translation.y = tf_transform.getOrigin().y();
-  transform.translation.z = tf_transform.getOrigin().z();
-  transform.rotation.x = tf_transform.getRotation().x();
-  transform.rotation.y = tf_transform.getRotation().y();
-  transform.rotation.z = tf_transform.getRotation().z();
-  transform.rotation.w = tf_transform.getRotation().w();
-  velodyne_pub.publish(transform);
 }

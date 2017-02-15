@@ -16,6 +16,7 @@ catkin_simple(ALL_DEPS_REQUIRED)
 
 cs_add_library(${PROJECT_NAME} 
     src/state_and_path_publisher.cpp
+    src/car_model.cpp
 )
 
 cs_add_executable(state_estimation src/state_estimation.cpp)

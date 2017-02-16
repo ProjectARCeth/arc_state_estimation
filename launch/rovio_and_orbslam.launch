@@ -2,7 +2,7 @@
 	
 <launch>
 
-  <node name="state_estimation" pkg="arc_state_estimation" type="state_estimation" args="teach current_path last_path"output="screen"/>
+  <node name="state_estimation" pkg="arc_state_estimation" type="state_estimation" args="teach current_path last_path" output="screen"/>
 
   <node pkg="rviz" name="myrviz" type="rviz" args="home/catkin_ws/src/arc_state_estimation/launch/default.rviz" />
 	

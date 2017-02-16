@@ -3,6 +3,7 @@ project(arc_state_estimation)
 
 find_package(catkin_simple 0.1.0 REQUIRED COMPONENTS
   	roscpp
+  	roslib
     geometry_msgs
     std_msgs
     arc_tools

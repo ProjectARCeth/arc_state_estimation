@@ -4,7 +4,8 @@
 #include "Eigen/Dense"
 #include <fstream>
 #include <iostream>
-#include "ros/ros.h"
+#include <ros/ros.h>
+#include <ros/package.h>
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/Quaternion.h"
 #include "geometry_msgs/Transform.h"
@@ -18,15 +19,14 @@
 #include "arc_state_estimation/car_model.hpp"
 
 //Definition of constants.
-float DISTANCE_WHEEL_AXES = 2.3; //[m]
-float LENGTH_WHEEL_AXIS = 1.6; //[m]
-int QUEUE_LENGTH = 10;  //Updating queue ~ frequency.
-float CURRENT_ARRAY_SEARCHING_WIDTH = 4.0; //[m]
-float CURRENT_ARRAY_MAXIMAL_WIDTH = 100.0; //[m]
+float DISTANCE_WHEEL_AXES;
+float LENGTH_WHEEL_AXIS;
+int QUEUE_LENGTH;
+float CURRENT_ARRAY_SEARCHING_WIDTH;
+float MAX_DEVIATION_FROM_TEACH_PATH;
 std::string LAST_PATH_FILENAME;
 std::string CURRENT_PATH_FILENAME;
 std::string TEACH_REPEAT;
-//TODO: Konstanten als argv oder in yaml file.
 //Subcriber and publisher.
 ros::Subscriber left_wheel_sub;
 ros::Subscriber rov_sub;
@@ -61,14 +61,19 @@ void velocity_right_sub(const std_msgs::Float64::ConstPtr& msg);
 arc_state_estimation::CarModel car_model(DISTANCE_WHEEL_AXES, LENGTH_WHEEL_AXIS);
 
 int main(int argc, char** argv){
-  //Setting input arguments.
-  TEACH_REPEAT = std::string(argv[0]);
-  CURRENT_PATH_FILENAME = std::string(argv[1]);
-  LAST_PATH_FILENAME = std::string(argv[2]);
   //Init ROS.
 	ros::init(argc, argv, "arc_state_estimation");
 	ros::NodeHandle node;
-  //Initialising.
+  //Getting parameter.
+  node.getParam("/state_estimation/erod/DISTANCE_WHEEL_AXES", DISTANCE_WHEEL_AXES);
+  node.getParam("/state_estimation/erod/LENGTH_WHEEL_AXIS", LENGTH_WHEEL_AXIS);
+  node.getParam("/state_estimation/mode/TEACH_REPEAT", TEACH_REPEAT);
+  node.getParam("/state_estimation/general/QUEUE_LENGTH", QUEUE_LENGTH);
+  node.getParam("/state_estimation/general/CURRENT_ARRAY_SEARCHING_WIDTH", CURRENT_ARRAY_SEARCHING_WIDTH);
+  node.getParam("/state_estimation/safety/MAX_DEVIATION_FROM_TEACH_PATH", MAX_DEVIATION_FROM_TEACH_PATH);
+  node.getParam("/state_estimation/files/LAST_PATH_FILENAME", LAST_PATH_FILENAME);
+  node.getParam("/state_estimation/files/CURRENT_PATH_FILENAME", CURRENT_PATH_FILENAME);
+  // Initialising.
   init_state_estimation(&node);
   //Spinning.
 	ros::spin();
@@ -114,8 +119,7 @@ void close_state_estimation(){
 }
 
 void rovio_sub(const nav_msgs::Odometry::ConstPtr & odom_data){
-  //If teach the take position out of rovio, orientation and velocity always from rovio.
-  if(!mode) state.pose.pose.position = odom_data->pose.pose.position;
+  //Orientation and velocity out of Rovio.
   state.pose.pose.orientation = odom_data->pose.pose.orientation;
   state.pose_diff.twist = odom_data->twist.twist;
   //update state and path.
@@ -123,9 +127,8 @@ void rovio_sub(const nav_msgs::Odometry::ConstPtr & odom_data){
 }
 
 void orbslam_sub(const nav_msgs::Odometry::ConstPtr & odom_data){
-  //If repeat then take position from orbslam.
-  if(mode) state.pose.pose.position = odom_data->pose.pose.position; 
-  //TODO: Rovio set to pose in rovio.
+  //Position out of orbslam (always).
+  state.pose.pose.position = odom_data->pose.pose.position; 
   //Update state and path.
   odomUpdater();
 }
@@ -218,15 +221,16 @@ int search_current_array_position(const std::string teach_path_file){
   }
   //Finding last array position and current state.
   int last_array_position = array_position;
+  geometry_msgs::Pose last_pose = teach_path.poses[last_array_position].pose;
   geometry_msgs::Pose pose = state.pose.pose;
   //Finding maximal index so that in maximal width.
   int max_index = 0;
-  while(calculate_distance(pose, teach_path.poses[last_array_position+max_index].pose)
+  while(calculate_distance(last_pose, teach_path.poses[last_array_position+max_index].pose)
                  < CURRENT_ARRAY_SEARCHING_WIDTH){
     max_index += 1;
   }
   //Searching closest point.
-  double shortest_distance = CURRENT_ARRAY_MAXIMAL_WIDTH;
+  double shortest_distance = MAX_DEVIATION_FROM_TEACH_PATH;
   int smallest_distance_index = last_array_position;
   for (int s = last_array_position-max_index; s < last_array_position+max_index; s++){
     double current_distance = calculate_distance(pose, teach_path.poses[s].pose);
@@ -236,7 +240,7 @@ int search_current_array_position(const std::string teach_path_file){
     }
   }
   //Check maximal distance.
-  if (shortest_distance == CURRENT_ARRAY_MAXIMAL_WIDTH) state.stop = true; 
+  if (shortest_distance == MAX_DEVIATION_FROM_TEACH_PATH) state.stop = true; 
   return smallest_distance_index;
 }
 

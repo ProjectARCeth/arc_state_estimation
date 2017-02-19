@@ -2,26 +2,12 @@
 	
 <launch>
 
-  <node name="state_estimation" pkg="arc_state_estimation" type="state_estimation" output="screen"/>
-
-  <node pkg="rviz" name="myrviz" type="rviz" args="home/catkin_ws/src/arc_state_estimation/launch/default.rviz" />
-	
-  <!-- starting GPS -->
-  <node name="gps" pkg="ublox_gps" type="ublox_gps" output="screen">
-   <param name="device" type="string" value="/dev/ttyACM0"/>
-   <param name="frame_id" type="string" value="gps"/>
-   <param name="baudrate" type="int" value="57600"/>
-   <param name="rate" type="int" value="10"/>
-   <param name="enable_sbas" type="bool" value="false"/>
-   <param name="dynamic_model" type="string" value="portable"/>
-   <param name="fix_mode" type="string" value="both"/>
-   <param name="dr_limit" type="int" value="0"/>
-   <param name="enable_beidou" type="bool" value="false"/>
-   <param name="enable_glonass" type="bool" value="false"/>
-   <param name="enable_ppp" type="bool" value="false"/>
-   <param name="ublox_version" type="int" value="8"/>
+   <node name="state_estimation" pkg="arc_state_estimation" type="state_estimation" output="screen">
+	<rosparam command="load" file="$(find arc_launch)/arc.yaml" />
   </node>
-	
+
+  <node pkg="rviz" name="myrviz" type="rviz"/>
+
   <!-- starting Rovio -->
   <node pkg="rovio" type="rovio_node" name="rovio" output="screen">
    <param name="filter_config" value="$(find rovio)/cfg/rovio_test.info"/>

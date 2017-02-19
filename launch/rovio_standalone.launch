@@ -2,9 +2,11 @@
 	
 <launch>
 
-  <node name="state_estimation" pkg="arc_state_estimation" type="state_estimation" output="screen"/>
+   <node name="state_estimation" pkg="arc_state_estimation" type="state_estimation" output="screen">
+	<rosparam command="load" file="$(find arc_launch)/arc.yaml" />
+  </node>
 
-  <node pkg="rviz" name="myrviz" type="rviz" args="home/catkin_ws/src/arc_state_estimation/launch/default.rviz" />
+  <node pkg="rviz" name="myrviz" type="rviz"/>
 
   <!-- starting Rovio -->
   <node pkg="rovio" type="rovio_node" name="rovio" output="screen">

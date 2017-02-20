@@ -72,8 +72,7 @@ void velocityRightCallback(const std_msgs::Float64::ConstPtr& msg);
 //Init class objects.
 arc_state_estimation::CarModel car_model(DISTANCE_WHEEL_AXES, LENGTH_WHEEL_AXIS);
 
-int main(int argc, char** 
-){
+int main(int argc, char** argv){
   //Init ROS.
 	ros::init(argc, argv, "arc_state_estimation");
 	ros::NodeHandle node;

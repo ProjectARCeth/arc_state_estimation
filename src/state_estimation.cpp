@@ -25,6 +25,9 @@ float LENGTH_WHEEL_AXIS;
 int QUEUE_LENGTH;
 float CURRENT_ARRAY_SEARCHING_WIDTH;
 float MAX_DEVIATION_FROM_TEACH_PATH;
+float MAX_VELOCITY_DIVERGENCE;
+float MAX_ABSOLUTE_VELOCITY;
+float MAX_ORIENTATION_DIVERGENCE;
 std::string LAST_PATH_FILENAME;
 std::string CURRENT_PATH_FILENAME;
 std::string TEACH_REPEAT;
@@ -69,7 +72,8 @@ void velocityRightCallback(const std_msgs::Float64::ConstPtr& msg);
 //Init class objects.
 arc_state_estimation::CarModel car_model(DISTANCE_WHEEL_AXES, LENGTH_WHEEL_AXIS);
 
-int main(int argc, char** argv){
+int main(int argc, char** 
+){
   //Init ROS.
 	ros::init(argc, argv, "arc_state_estimation");
 	ros::NodeHandle node;
@@ -241,13 +245,25 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
   int i=0;
   int array_index;  
   nav_msgs::Path teach_path;
+  nav_msgs::Path teach_path_diff;
   while(!stream.eof()&& i<length){
     geometry_msgs::PoseStamped temp_pose;
+    geometry_msgs::PoseStamped temp_pose_diff;
     stream>>array_index;
     stream>>temp_pose.pose.position.x;
     stream>>temp_pose.pose.position.y;
-    stream>>temp_pose.pose.position.z; 
+    stream>>temp_pose.pose.position.z;
+    //Reading teach orientation
+    stream>>temp_pose.pose.orientation.x;
+    stream>>temp_pose.pose.orientation.y;
+    stream>>temp_pose.pose.orientation.z;
+    stream>>temp_pose.pose.orientation.w;
+    //Reading teach velocity
+    stream>>temp_pose_diff.pose.position.x;
+    stream>>temp_pose_diff.pose.position.y;
+    stream>>temp_pose_diff.pose.position.z;
     teach_path.poses.push_back(temp_pose);
+    teach_path_diff.poses.push_back(temp_pose_diff);
     stream.ignore (300, '|');
     i++;  
   }
@@ -271,8 +287,23 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
       smallest_distance_index = s;
     }
   }
-  //Check maximal distance.
-  if (shortest_distance == MAX_DEVIATION_FROM_TEACH_PATH) state.stop = true; 
+  //Checkliste.
+  //1)Check maximal distance.
+  if (shortest_distance >= MAX_DEVIATION_FROM_TEACH_PATH) state.stop = true; 
+  //2)Check absolute maximal velocity (only xy direction).
+  float v_abs=sqrt(pow(state.pose_diff.twist.linear.x,2)+pow(state.pose_diff.twist.linear.y,2));
+  if (v_abs >= MAX_ABSOLUTE_VELOCITY) state.stop = true;
+  //3)Check divergence to teach velocity (only xy direction).
+  float v_teach=sqrt(pow(teach_path_diff.poses[smallest_distance_index].pose.position.x,2)+pow(teach_path_diff.poses[smallest_distance_index].pose.position.y,2));
+  if ((v_abs-v_teach)>=MAX_VELOCITY_DIVERGENCE) state.stop = true;
+  //4)Check divergence to teach orientation.
+        //erst in euler umformen dann winkel vergleichen.
+  //5)Check localisation quality.
+  float state_orientation;
+  float path_orientation;  //At smallest_distance_index.
+  float alpha=abs(state_orientation-path_orientation);
+  if (alpha>=MAX_ORIENTATION_DIVERGENCE) state.stop = true;
+  //Ende Checkliste
   return smallest_distance_index;
 }
 

@@ -63,7 +63,8 @@ void velocity_right_sub(const std_msgs::Float64::ConstPtr& msg);
 //Init class objects.
 arc_state_estimation::CarModel car_model(DISTANCE_WHEEL_AXES, LENGTH_WHEEL_AXIS);
 
-int main(int argc, char** argv){
+int main(int argc, char** 
+){
   //Init ROS.
 	ros::init(argc, argv, "arc_state_estimation");
 	ros::NodeHandle node;
@@ -257,7 +258,7 @@ int search_current_array_position(const std::string teach_path_file){
   //Checkliste.
   //1)Check maximal distance.
   if (shortest_distance >= MAX_DEVIATION_FROM_TEACH_PATH) state.stop = true; 
-  //2)Check absollute maximal velocity (only xy direction).
+  //2)Check absolute maximal velocity (only xy direction).
   float v_abs=sqrt(pow(state.pose_diff.twist.linear.x,2)+pow(state.pose_diff.twist.linear.y,2));
   if (v_abs >= MAX_ABSOLUTE_VELOCITY) state.stop = true;
   //3)Check divergence to teach velocity (only xy direction).

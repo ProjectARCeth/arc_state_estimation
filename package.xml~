@@ -10,7 +10,7 @@
   	<buildtool_depend>catkin</buildtool_depend>
 
   	<build_depend>roscpp</build_depend>
-	<build_depend>rosli"</build_depend>
+	<build_depend>roslib</build_depend>
   	<build_depend>std_msgs</build_depend>
 	<build_depend>geometry_msgs</build_depend>
 	<build_depend>arc_tools</build_depend>
@@ -18,6 +18,7 @@
 	<build_depend>catkin_simple</build_depend>
 	<build_depend>eigen_catkin</build_depend>
 	<build_depend>tf</build_depend>
+	<build_depend>catkin_simple</build_depend>
 
   	<run_depend>roscpp</run_depend>
 	<run_depend>roslib</run_depend>
@@ -28,5 +29,6 @@
 	<run_depend>catkin_simple</run_depend>
 	<run_depend>eigen_catkin</run_depend>
 	<run_depend>tf</run_depend>
+	<run_depend>catkin_simple</run_depend>
 	
 </package>

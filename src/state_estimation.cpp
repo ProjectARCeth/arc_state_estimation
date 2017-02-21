@@ -31,7 +31,6 @@ float MAX_ORIENTATION_DIVERGENCE;
 std::string LAST_PATH_FILENAME;
 std::string CURRENT_PATH_FILENAME;
 std::string TEACH_REPEAT;
-bool ROVIO, ORBSLAM;
 //Subcriber and publisher.
 ros::Subscriber left_wheel_sub;
 ros::Subscriber rov_sub;
@@ -85,8 +84,6 @@ int main(int argc, char** argv){
   node.getParam("/safety/MAX_DEVIATION_FROM_TEACH_PATH", MAX_DEVIATION_FROM_TEACH_PATH);
   node.getParam("/files/LAST_PATH_FILENAME", LAST_PATH_FILENAME);
   node.getParam("/files/CURRENT_PATH_FILENAME", CURRENT_PATH_FILENAME);
-  node.getParam("/program/ROVIO", ROVIO);
-  node.getParam("/program/ORBSLAM", ORBSLAM);
   // Initialising.
   initStateEstimation(&node);
   //Spinning.
@@ -103,10 +100,6 @@ void initStateEstimation(ros::NodeHandle* node){
               << "STATE ESTIMATION: Please set mode: 'teach' or 'repeat'" << std::endl;
     ros::shutdown();
   }
-  //Checking localisation porgram.
-  if(!ORBSLAM && !ROVIO) 
-    std::cout << std::endl 
-              << "STATE ESTIMATION: no localisation program active !" << std::endl; 
   //Initialise output stream.
   std::string filename_all = CURRENT_PATH_FILENAME+".txt";
   stream.open(filename_all.c_str());
@@ -126,9 +119,6 @@ void initStateEstimation(ros::NodeHandle* node){
   rov_sub = node->subscribe("rovio/odometry", QUEUE_LENGTH, rovioCallback);
   orb_sub = node->subscribe("orb_slam2/odometry", QUEUE_LENGTH, orbslamCallback);
   std::cout << std::endl << "STATE ESTIMATION: Initialised" << " mode " << TEACH_REPEAT;  
-  if(ORBSLAM && ROVIO) std::cout << " using OrbSlam and Rovio " << std::endl;
-  if(ORBSLAM && !ROVIO) std::cout << " using only OrbSlam " << std::endl;
-  if(!ORBSLAM && ROVIO) std::cout << " using only Rovio " << std::endl;
 }
 
 void closeStateEstimation(){
@@ -141,7 +131,6 @@ void closeStateEstimation(){
 
 void rovioCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
   //Orientation and velocity out of Rovio. 
-  if(!ORBSLAM) state.pose.pose.position = odom_data->pose.pose.position;
   state.pose.pose.orientation = odom_data->pose.pose.orientation;
   state.pose_diff.twist = odom_data->twist.twist;
   //update state and path.
@@ -151,10 +140,6 @@ void rovioCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
 void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
   //Position out of orbslam (always).
   state.pose.pose.position = odom_data->pose.pose.position; 
-  if(!ROVIO){
-    state.pose.pose.orientation = odom_data->pose.pose.orientation;
-    state.pose_diff.twist = odom_data->twist.twist;
-  }
   //Update state and path.
   odomUpdater();
 }

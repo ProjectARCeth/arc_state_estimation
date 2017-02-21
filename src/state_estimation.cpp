@@ -28,28 +28,32 @@ float MAX_DEVIATION_FROM_TEACH_PATH;
 float MAX_VELOCITY_DIVERGENCE;
 float MAX_ABSOLUTE_VELOCITY;
 float MAX_ORIENTATION_DIVERGENCE;
+float MIN_SHUTDOWN_VELOCITY;
 std::string LAST_PATH_FILENAME;
 std::string CURRENT_PATH_FILENAME;
-std::string TEACH_REPEAT;
 //Subcriber and publisher.
 ros::Subscriber left_wheel_sub;
+ros::Subscriber mode_sub;
 ros::Subscriber rov_sub;
 ros::Subscriber orb_sub;
 ros::Subscriber right_wheel_sub;
 ros::Subscriber steering_sub;
+ros::Subscriber shutdown_sub;
 ros::Subscriber stop_sub;
 ros::Publisher path_pub;
 ros::Publisher rear_axle_pub;
 ros::Publisher state_pub;
+ros::Publisher tracking_error_pub;
 ros::Publisher velodyne_pub;
 //Path and output file.
 std::ofstream stream;
 arc_msgs::State state;
 int array_position;
 bool stop = false;
+bool shutdown = false;
 nav_msgs::Path current_path;
-//Mode: Teach (0) or Repeat (1).
-bool mode;
+//Mode: Teach (0) = Default or Repeat (1).
+bool mode = false; 
 //State as an Eigen::Vector.
 Eigen::Vector3d position;
 Eigen::Vector4d quat;
@@ -59,11 +63,14 @@ Eigen::Vector3d ang_vel;
 double calculateDistance(geometry_msgs::Pose base, geometry_msgs::Pose target);
 void closeStateEstimation();
 void initStateEstimation(ros::NodeHandle* node);
+void modeCallback(const std_msgs::Bool::ConstPtr& msg);
 void odomUpdater();
-void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data);
-void rovioCallback(const nav_msgs::Odometry::ConstPtr & odom_data);
+void orbslamCallback(const nav_msgs::Odometry::ConstPtr& odom_data);
+void rovioCallback(const nav_msgs::Odometry::ConstPtr& odom_data);
 int searchCurrentArrayPosition(const std::string teach_path_file); 
+void shutdownCallback(const std_msgs::Bool::ConstPtr& msg);
 void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg);
+void stopWithReason(std::string reason);
 void stopCallback(const std_msgs::Bool::ConstPtr& msg);
 void tfBroadcaster(const Eigen::Vector4d euler, const Eigen::Vector3d position, std::string tf_name);
 void velocityLeftCallback(const std_msgs::Float64::ConstPtr& msg);
@@ -78,10 +85,11 @@ int main(int argc, char** argv){
   //Getting parameter.
   node.getParam("/erod/DISTANCE_WHEEL_AXES", DISTANCE_WHEEL_AXES);
   node.getParam("/erod/LENGTH_WHEEL_AXIS", LENGTH_WHEEL_AXIS);
-  node.getParam("/mode/TEACH_REPEAT", TEACH_REPEAT);
   node.getParam("/general/QUEUE_LENGTH", QUEUE_LENGTH);
   node.getParam("/general/CURRENT_ARRAY_SEARCHING_WIDTH", CURRENT_ARRAY_SEARCHING_WIDTH);
   node.getParam("/safety/MAX_DEVIATION_FROM_TEACH_PATH", MAX_DEVIATION_FROM_TEACH_PATH);
+  node.getParam("/safety/MAX_ORIENTATION_DIVERGENCE", MAX_ORIENTATION_DIVERGENCE);
+  node.getParam("/safety/MIN_SHUTDOWN_VELOCITY", MIN_SHUTDOWN_VELOCITY);
   node.getParam("/files/LAST_PATH_FILENAME", LAST_PATH_FILENAME);
   node.getParam("/files/CURRENT_PATH_FILENAME", CURRENT_PATH_FILENAME);
   // Initialising.
@@ -92,14 +100,6 @@ int main(int argc, char** argv){
 }
 
 void initStateEstimation(ros::NodeHandle* node){
-  //Setting mode.
-  if(TEACH_REPEAT == "teach") mode = false;
-  else if(TEACH_REPEAT == "repeat") mode = true;
-  else{
-    std::cout << std::endl 
-              << "STATE ESTIMATION: Please set mode: 'teach' or 'repeat'" << std::endl;
-    ros::shutdown();
-  }
   //Initialise output stream.
   std::string filename_all = CURRENT_PATH_FILENAME+".txt";
   stream.open(filename_all.c_str());
@@ -108,17 +108,19 @@ void initStateEstimation(ros::NodeHandle* node){
   // Publisher and subscriber.
   car_model.createPublisher(node);
   left_wheel_sub = node->subscribe("v_left", QUEUE_LENGTH, velocityLeftCallback);
+  mode_sub = node->subscribe("mode", QUEUE_LENGTH, modeCallback);
+  orb_sub = node->subscribe("orb_slam2/odometry", QUEUE_LENGTH, orbslamCallback);
   right_wheel_sub = node->subscribe("v_right", QUEUE_LENGTH, velocityRightCallback);
+  rov_sub = node->subscribe("rovio/odometry", QUEUE_LENGTH, rovioCallback);
+  shutdown_sub = node->subscribe("shutdown", QUEUE_LENGTH, shutdownCallback);
   steering_sub = node->subscribe("steer_angle", QUEUE_LENGTH, steeringAngleCallback);
   stop_sub = node->subscribe("state/stop", QUEUE_LENGTH, stopCallback);
   path_pub = node->advertise<nav_msgs::Path>("/path", QUEUE_LENGTH);
   rear_axle_pub = node->advertise<geometry_msgs::Transform>("/rear_axle/odom", QUEUE_LENGTH);
   state_pub = node->advertise<arc_msgs::State>("/state", QUEUE_LENGTH);
+  tracking_error_pub = node->advertise<std_msgs::Float64>("/tracking_error", QUEUE_LENGTH);
   velodyne_pub = node->advertise<geometry_msgs::Transform>("/velodyne/odom", QUEUE_LENGTH);
-  //Mode dependent publisher and subscriber.
-  rov_sub = node->subscribe("rovio/odometry", QUEUE_LENGTH, rovioCallback);
-  orb_sub = node->subscribe("orb_slam2/odometry", QUEUE_LENGTH, orbslamCallback);
-  std::cout << std::endl << "STATE ESTIMATION: Initialised" << " mode " << TEACH_REPEAT;  
+  std::cout << std::endl << "STATE ESTIMATION: Initialised";  
 }
 
 void closeStateEstimation(){
@@ -127,6 +129,7 @@ void closeStateEstimation(){
   stream.close();
   //Finishing ros.
   ros::shutdown();
+  ros::waitForShutdown();
 }
 
 void rovioCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
@@ -145,6 +148,12 @@ void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
 }
 
 void odomUpdater(){
+  //Tf broadcasting.
+  position = arc_tools::transformPointMessageToEigen(state.pose.pose.position);
+  quat = arc_tools::transformQuatMessageToEigen(state.pose.pose.orientation);
+  lin_vel = arc_tools::transformVectorMessageToEigen(state.pose_diff.twist.linear);
+  ang_vel = arc_tools::transformVectorMessageToEigen(state.pose_diff.twist.angular);
+  tfBroadcaster(quat, position, "vi");
   //Indexing state: if teach then iterate, if repeat search closest point.
   if(!mode) array_position += 1; 
   if(mode) array_position = searchCurrentArrayPosition(LAST_PATH_FILENAME);
@@ -152,12 +161,6 @@ void odomUpdater(){
   state.stop = stop;
   state.current_arrayposition = array_position;
   current_path.poses.push_back(state.pose);
-  //Tf broadcasting.
-  position = arc_tools::transformPointMessageToEigen(state.pose.pose.position);
-  quat = arc_tools::transformQuatMessageToEigen(state.pose.pose.orientation);
-  lin_vel = arc_tools::transformVectorMessageToEigen(state.pose_diff.twist.linear);
-  ang_vel = arc_tools::transformVectorMessageToEigen(state.pose_diff.twist.angular);
-  tfBroadcaster(quat, position, "vi");
   //Publishing.
   state_pub.publish(state);
   path_pub.publish(current_path);
@@ -169,6 +172,18 @@ void odomUpdater(){
            ang_vel(0)<<" "<<ang_vel(1)<<" "<<ang_vel(2)<<" "<<stop<<"|";
 } 
 
+void modeCallback(const std_msgs::Bool::ConstPtr& msg){
+  mode = msg->data;
+}
+
+void shutdownCallback(const std_msgs::Bool::ConstPtr& msg){
+  shutdown = msg->data;
+  // Shutdown iff velocity is close to zero (control needs state estimation).
+  if (shutdown){
+    if (lin_vel.norm() < MIN_SHUTDOWN_VELOCITY) closeStateEstimation();
+  }
+}
+
 void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg){
   float steering_angle = msg->data;
   car_model.set_steering_angle(steering_angle);
@@ -176,9 +191,11 @@ void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg){
   car_model.updateModel(quat);
 }
 
-
 void stopCallback(const std_msgs::Bool::ConstPtr& msg){
-   stop = msg->data;
+   //Change stop bool iff false.
+   if (!stop) stop = msg->data;
+   //Close state estimation if true.
+   if (stop) closeStateEstimation();
 }
 
 void velocityLeftCallback(const std_msgs::Float64::ConstPtr& msg){
@@ -271,23 +288,25 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
       smallest_distance_index = s;
     }
   }
-  //Checkliste.
+  //Checkliste safety.
   //1)Check maximal distance.
-  if (shortest_distance >= MAX_DEVIATION_FROM_TEACH_PATH) state.stop = true; 
+  if (shortest_distance >= MAX_DEVIATION_FROM_TEACH_PATH) stopWithReason("deviation from teach path");
   //2)Check absolute maximal velocity (only xy direction).
   float v_abs=sqrt(pow(state.pose_diff.twist.linear.x,2)+pow(state.pose_diff.twist.linear.y,2));
-  if (v_abs >= MAX_ABSOLUTE_VELOCITY) state.stop = true;
+  if (v_abs >= MAX_ABSOLUTE_VELOCITY) stopWithReason("absolute velocity");
   //3)Check divergence to teach velocity (only xy direction).
   float v_teach=sqrt(pow(teach_path_diff.poses[smallest_distance_index].pose.position.x,2)+pow(teach_path_diff.poses[smallest_distance_index].pose.position.y,2));
-  if ((v_abs-v_teach)>=MAX_VELOCITY_DIVERGENCE) state.stop = true;
-  //4)Check divergence to teach orientation.
-        //erst in euler umformen dann winkel vergleichen.
-  //5)Check localisation quality.
-  float state_orientation;
-  float path_orientation;  //At smallest_distance_index.
-  float alpha=abs(state_orientation-path_orientation);
-  if (alpha>=MAX_ORIENTATION_DIVERGENCE) state.stop = true;
-  //Ende Checkliste
+  if ((v_abs-v_teach)>=MAX_VELOCITY_DIVERGENCE) stopWithReason("velocity divergence");
+  //4)Check divergence to teach orientation (normal to plane orientation).
+  float current_orientation = arc_tools::transformEulerQuaternionVector(quat)(0);
+  Eigen::Vector4d path_quat = arc_tools::transformQuatMessageToEigen(teach_path.poses[smallest_distance_index].pose.orientation);
+  float path_orientation = arc_tools::transformEulerQuaternionVector(path_quat)(0);
+  float alpha=abs(current_orientation - path_orientation);
+  if (alpha>=MAX_ORIENTATION_DIVERGENCE) stopWithReason("orientation divergence");
+  //Publish tracking error.
+  std_msgs::Float64 shortest_distance_msg;
+  shortest_distance_msg.data = shortest_distance;
+  tracking_error_pub.publish(shortest_distance_msg);
   return smallest_distance_index;
 }
 
@@ -301,4 +320,9 @@ double calculateDistance(geometry_msgs::Pose base, geometry_msgs::Pose target){
   double distance = sqrt((x_base-x_target)*(x_base-x_target) + 
                         (y_base-y_target)*(y_base-y_target) + (z_base-z_target)*(z_base-z_target));
   return distance;
+}
+
+void stopWithReason(std::string reason){
+  stop = true;
+  std::cout << std::endl << "STATE ESTIMATION: STOP due to " << reason << std::endl;
 }

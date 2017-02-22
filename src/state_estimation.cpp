@@ -114,7 +114,7 @@ void initStateEstimation(ros::NodeHandle* node){
   rov_sub = node->subscribe("rovio/odometry", QUEUE_LENGTH, rovioCallback);
   shutdown_sub = node->subscribe("shutdown", QUEUE_LENGTH, shutdownCallback);
   steering_sub = node->subscribe("steer_angle", QUEUE_LENGTH, steeringAngleCallback);
-  stop_sub = node->subscribe("state/stop", QUEUE_LENGTH, stopCallback);
+  stop_sub = node->subscribe("/state/stop", QUEUE_LENGTH, stopCallback);
   path_pub = node->advertise<nav_msgs::Path>("/path", QUEUE_LENGTH);
   rear_axle_pub = node->advertise<geometry_msgs::Transform>("/rear_axle/odom", QUEUE_LENGTH);
   state_pub = node->advertise<arc_msgs::State>("/state", QUEUE_LENGTH);
@@ -298,9 +298,9 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
   float v_teach=sqrt(pow(teach_path_diff.poses[smallest_distance_index].pose.position.x,2)+pow(teach_path_diff.poses[smallest_distance_index].pose.position.y,2));
   if ((v_abs-v_teach)>=MAX_VELOCITY_DIVERGENCE) stopWithReason("velocity divergence");
   //4)Check divergence to teach orientation (normal to plane orientation).
-  float current_orientation = arc_tools::transformEulerQuaternionVector(quat)(0);
+  float current_orientation = arc_tools::transformEulerQuaternionVector(quat)(2);
   Eigen::Vector4d path_quat = arc_tools::transformQuatMessageToEigen(teach_path.poses[smallest_distance_index].pose.orientation);
-  float path_orientation = arc_tools::transformEulerQuaternionVector(path_quat)(0);
+  float path_orientation = arc_tools::transformEulerQuaternionVector(path_quat)(2);
   float alpha=abs(current_orientation - path_orientation);
   if (alpha>=MAX_ORIENTATION_DIVERGENCE) stopWithReason("orientation divergence");
   //Publish tracking error.

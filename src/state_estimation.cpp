@@ -136,6 +136,10 @@ void rovioCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
   //Orientation and velocity out of Rovio. 
   state.pose.pose.orientation = odom_data->pose.pose.orientation;
   state.pose_diff.twist = odom_data->twist.twist;
+  //Testing.
+  Eigen::Vector4d rovio_quat = arc_tools::transformQuatMessageToEigen(odom_data->pose.pose.orientation);
+  Eigen::Vector3d rovio_euler = arc_tools::transformEulerQuaternionVector(rovio_quat);
+  std::cout << rovio_euler << std::endl;
   //update state and path.
   odomUpdater();
 }

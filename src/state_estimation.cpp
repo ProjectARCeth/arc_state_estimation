@@ -6,6 +6,7 @@
 #include <iostream>
 #include <ros/ros.h>
 #include <ros/package.h>
+#include "geometry_msgs/Point.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/Quaternion.h"
 #include "geometry_msgs/Transform.h"
@@ -31,6 +32,15 @@ float MAX_ORIENTATION_DIVERGENCE;
 float MIN_SHUTDOWN_VELOCITY;
 std::string LAST_PATH_FILENAME;
 std::string CURRENT_PATH_FILENAME;
+std::string MODE_TOPIC;
+std::string PATH_TOPIC;
+std::string SHUTDOWN_TOPIC;
+std::string STATE_TOPIC;
+std::string STEERING_ANGLE_TOPIC;
+std::string TRACKING_ERROR_TOPIC;
+std::string TRACKING_VEL_ERROR_TOPIC;
+std::string WHEEL_SENSORS_LEFT_TOPIC;
+std::string WHEEL_SENSORS_RIGHT_TOPIC;
 //Subcriber and publisher.
 ros::Subscriber left_wheel_sub;
 ros::Subscriber mode_sub;
@@ -44,6 +54,7 @@ ros::Publisher path_pub;
 ros::Publisher rear_axle_pub;
 ros::Publisher state_pub;
 ros::Publisher tracking_error_pub;
+ros::Publisher tracking_error_vel_pub;
 ros::Publisher velodyne_pub;
 //Path and output file.
 std::ofstream stream;
@@ -71,7 +82,6 @@ int searchCurrentArrayPosition(const std::string teach_path_file);
 void shutdownCallback(const std_msgs::Bool::ConstPtr& msg);
 void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg);
 void stopWithReason(std::string reason);
-void stopCallback(const std_msgs::Bool::ConstPtr& msg);
 void tfBroadcaster(const Eigen::Vector4d euler, const Eigen::Vector3d position, std::string tf_name);
 void velocityLeftCallback(const std_msgs::Float64::ConstPtr& msg);
 void velocityRightCallback(const std_msgs::Float64::ConstPtr& msg);
@@ -92,6 +102,15 @@ int main(int argc, char** argv){
   node.getParam("/safety/MIN_SHUTDOWN_VELOCITY", MIN_SHUTDOWN_VELOCITY);
   node.getParam("/files/LAST_PATH_FILENAME", LAST_PATH_FILENAME);
   node.getParam("/files/CURRENT_PATH_FILENAME", CURRENT_PATH_FILENAME);
+  node.getParam("/topic/STATE", STATE_TOPIC);
+  node.getParam("/topic/STEERING_ANGLE", STEERING_ANGLE_TOPIC);
+  node.getParam("/topic/WHEEL_SENSORS_LEFT", WHEEL_SENSORS_LEFT_TOPIC);
+  node.getParam("/topic/WHEEL_SENSORS_RIGHT", WHEEL_SENSORS_RIGHT_TOPIC);
+  node.getParam("/topic/TRACKING_ERROR", TRACKING_ERROR_TOPIC);
+  node.getParam("/topic/TRACKING_ERROR_VELOCITY", TRACKING_VEL_ERROR_TOPIC);
+  node.getParam("/topic/MODE", MODE_TOPIC);
+  node.getParam("/topic/PATH", PATH_TOPIC);
+  node.getParam("/topic/SHUTDOWN", SHUTDOWN_TOPIC);
   // Initialising.
   initStateEstimation(&node);
   //Spinning.
@@ -107,20 +126,20 @@ void initStateEstimation(ros::NodeHandle* node){
   array_position = 0;
   // Publisher and subscriber.
   car_model.createPublisher(node);
-  left_wheel_sub = node->subscribe("v_left", QUEUE_LENGTH, velocityLeftCallback);
-  mode_sub = node->subscribe("mode", QUEUE_LENGTH, modeCallback);
+  left_wheel_sub = node->subscribe(WHEEL_SENSORS_LEFT_TOPIC, QUEUE_LENGTH, velocityLeftCallback);
+  mode_sub = node->subscribe(MODE_TOPIC, QUEUE_LENGTH, modeCallback);
   orb_sub = node->subscribe("orb_slam2/odometry", QUEUE_LENGTH, orbslamCallback);
-  right_wheel_sub = node->subscribe("v_right", QUEUE_LENGTH, velocityRightCallback);
+  right_wheel_sub = node->subscribe(WHEEL_SENSORS_RIGHT_TOPIC, QUEUE_LENGTH, velocityRightCallback);
   rov_sub = node->subscribe("rovio/odometry", QUEUE_LENGTH, rovioCallback);
-  shutdown_sub = node->subscribe("shutdown", QUEUE_LENGTH, shutdownCallback);
-  steering_sub = node->subscribe("steer_angle", QUEUE_LENGTH, steeringAngleCallback);
-  stop_sub = node->subscribe("/state/stop", QUEUE_LENGTH, stopCallback);
-  path_pub = node->advertise<nav_msgs::Path>("/path", QUEUE_LENGTH);
+  shutdown_sub = node->subscribe(SHUTDOWN_TOPIC, QUEUE_LENGTH, shutdownCallback);
+  steering_sub = node->subscribe(STEERING_ANGLE_TOPIC, QUEUE_LENGTH, steeringAngleCallback);
+  path_pub = node->advertise<nav_msgs::Path>(PATH_TOPIC, QUEUE_LENGTH);
   rear_axle_pub = node->advertise<geometry_msgs::Transform>("/rear_axle/odom", QUEUE_LENGTH);
-  state_pub = node->advertise<arc_msgs::State>("/state", QUEUE_LENGTH);
-  tracking_error_pub = node->advertise<std_msgs::Float64>("/tracking_error", QUEUE_LENGTH);
+  state_pub = node->advertise<arc_msgs::State>(STATE_TOPIC, QUEUE_LENGTH);
+  tracking_error_pub = node->advertise<std_msgs::Float64>(TRACKING_ERROR_TOPIC, QUEUE_LENGTH);
+  tracking_error_vel_pub = node->advertise<std_msgs::Float64>(TRACKING_VEL_ERROR_TOPIC, QUEUE_LENGTH);
   velodyne_pub = node->advertise<geometry_msgs::Transform>("/velodyne/odom", QUEUE_LENGTH);
-  std::cout << std::endl << "STATE ESTIMATION: Initialised";  
+  std::cout << std::endl << "STATE ESTIMATION: Initialised" << std::endl;  
 }
 
 void closeStateEstimation(){
@@ -139,7 +158,6 @@ void rovioCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
   //Testing.
   Eigen::Vector4d rovio_quat = arc_tools::transformQuatMessageToEigen(odom_data->pose.pose.orientation);
   Eigen::Vector3d rovio_euler = arc_tools::transformEulerQuaternionVector(rovio_quat);
-  std::cout << rovio_euler << std::endl;
   //update state and path.
   odomUpdater();
 }
@@ -193,13 +211,6 @@ void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg){
   car_model.set_steering_angle(steering_angle);
   //Updating model.
   car_model.updateModel(quat);
-}
-
-void stopCallback(const std_msgs::Bool::ConstPtr& msg){
-   //Change stop bool iff false.
-   if (!stop) stop = msg->data;
-   //Close state estimation if true.
-   if (stop) closeStateEstimation();
 }
 
 void velocityLeftCallback(const std_msgs::Float64::ConstPtr& msg){
@@ -311,6 +322,12 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
   std_msgs::Float64 shortest_distance_msg;
   shortest_distance_msg.data = shortest_distance;
   tracking_error_pub.publish(shortest_distance_msg);
+  //Publish tracking error velocity.
+  std_msgs::Float64 velocity_tracking_error_msg;
+  geometry_msgs::Point temp_vel = teach_path_diff.poses[smallest_distance_index].pose.position;
+  Eigen::Vector3d path_vel(temp_vel.x, temp_vel.y, temp_vel.z);
+  velocity_tracking_error_msg.data = (path_vel - lin_vel).norm();
+  tracking_error_vel_pub.publish(velocity_tracking_error_msg);
   return smallest_distance_index;
 }
 

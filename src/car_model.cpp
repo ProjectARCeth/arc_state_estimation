@@ -9,7 +9,9 @@ CarModel::CarModel(float distance_wheels, float length_axis){
 }
 
 void CarModel::createPublisher(ros::NodeHandle* node){
-    pub_velocity_ = node->advertise<geometry_msgs::TwistWithCovarianceStamped>("car_model_velocity", 10);
+    std::string topic;
+    node->getParam("/topic/CAR_MODEL_VELOCITY", topic);
+    pub_velocity_ = node->advertise<geometry_msgs::TwistWithCovarianceStamped>(topic, 10);
 }
 
 void CarModel::updateModel(Eigen::Vector4d orientation){

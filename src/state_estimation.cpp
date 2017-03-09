@@ -21,6 +21,10 @@
 #include "arc_state_estimation/car_model.hpp"
 
 //Definition of constants.
+float CAM_INIT_QUAT_X;
+float CAM_INIT_QUAT_Y;
+float CAM_INIT_QUAT_W;
+float CAM_INIT_QUAT_Z;
 float DISTANCE_WHEEL_AXES;
 float LENGTH_WHEEL_AXIS;
 int QUEUE_LENGTH;
@@ -37,6 +41,7 @@ std::string PATH_TOPIC;
 std::string SHUTDOWN_TOPIC;
 std::string STATE_TOPIC;
 std::string STEERING_ANGLE_TOPIC;
+std::string TEACH_PATH_TOPIC;
 std::string TRACKING_ERROR_TOPIC;
 std::string TRACKING_VEL_ERROR_TOPIC;
 std::string WHEEL_SENSORS_LEFT_TOPIC;
@@ -51,11 +56,10 @@ ros::Subscriber steering_sub;
 ros::Subscriber shutdown_sub;
 ros::Subscriber stop_sub;
 ros::Publisher path_pub;
-ros::Publisher rear_axle_pub;
 ros::Publisher state_pub;
+ros::Publisher path_teach_pub;
 ros::Publisher tracking_error_pub;
 ros::Publisher tracking_error_vel_pub;
-ros::Publisher velodyne_pub;
 //Path and output file.
 std::ofstream stream;
 arc_msgs::State state;
@@ -93,6 +97,10 @@ int main(int argc, char** argv){
 	ros::init(argc, argv, "arc_state_estimation");
 	ros::NodeHandle node;
   //Getting parameter.
+  node.getParam("/sensor/CAM_INIT_QUAT_X", CAM_INIT_QUAT_X);
+  node.getParam("/sensor/CAM_INIT_QUAT_Y", CAM_INIT_QUAT_Y);
+  node.getParam("/sensor/CAM_INIT_QUAT_Z", CAM_INIT_QUAT_Z);
+  node.getParam("/sensor/CAM_INIT_QUAT_W", CAM_INIT_QUAT_W);
   node.getParam("/erod/DISTANCE_WHEEL_AXES", DISTANCE_WHEEL_AXES);
   node.getParam("/erod/LENGTH_WHEEL_AXIS", LENGTH_WHEEL_AXIS);
   node.getParam("/general/QUEUE_LENGTH", QUEUE_LENGTH);
@@ -104,12 +112,13 @@ int main(int argc, char** argv){
   node.getParam("/files/CURRENT_PATH_FILENAME", CURRENT_PATH_FILENAME);
   node.getParam("/topic/STATE", STATE_TOPIC);
   node.getParam("/topic/STEERING_ANGLE", STEERING_ANGLE_TOPIC);
-  node.getParam("/topic/WHEEL_SENSORS_LEFT", WHEEL_SENSORS_LEFT_TOPIC);
-  node.getParam("/topic/WHEEL_SENSORS_RIGHT", WHEEL_SENSORS_RIGHT_TOPIC);
+  node.getParam("/topic/WHEEL_REAR_LEFT", WHEEL_SENSORS_LEFT_TOPIC);
+  node.getParam("/topic/WHEEL_REAR_RIGHT", WHEEL_SENSORS_RIGHT_TOPIC);
   node.getParam("/topic/TRACKING_ERROR", TRACKING_ERROR_TOPIC);
   node.getParam("/topic/TRACKING_ERROR_VELOCITY", TRACKING_VEL_ERROR_TOPIC);
   node.getParam("/topic/MODE", MODE_TOPIC);
   node.getParam("/topic/PATH", PATH_TOPIC);
+  node.getParam("/topic/TEACH_PATH", TEACH_PATH_TOPIC);
   node.getParam("/topic/SHUTDOWN", SHUTDOWN_TOPIC);
   // Initialising.
   initStateEstimation(&node);
@@ -134,11 +143,10 @@ void initStateEstimation(ros::NodeHandle* node){
   shutdown_sub = node->subscribe(SHUTDOWN_TOPIC, QUEUE_LENGTH, shutdownCallback);
   steering_sub = node->subscribe(STEERING_ANGLE_TOPIC, QUEUE_LENGTH, steeringAngleCallback);
   path_pub = node->advertise<nav_msgs::Path>(PATH_TOPIC, QUEUE_LENGTH);
-  rear_axle_pub = node->advertise<geometry_msgs::Transform>("/rear_axle/odom", QUEUE_LENGTH);
+  path_teach_pub = node->advertise<nav_msgs::Path>(TEACH_PATH_TOPIC, QUEUE_LENGTH);
   state_pub = node->advertise<arc_msgs::State>(STATE_TOPIC, QUEUE_LENGTH);
   tracking_error_pub = node->advertise<std_msgs::Float64>(TRACKING_ERROR_TOPIC, QUEUE_LENGTH);
   tracking_error_vel_pub = node->advertise<std_msgs::Float64>(TRACKING_VEL_ERROR_TOPIC, QUEUE_LENGTH);
-  velodyne_pub = node->advertise<geometry_msgs::Transform>("/velodyne/odom", QUEUE_LENGTH);
   std::cout << std::endl << "STATE ESTIMATION: Initialised" << std::endl;  
 }
 
@@ -152,19 +160,23 @@ void closeStateEstimation(){
 }
 
 void rovioCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
-  //Orientation and velocity out of Rovio. 
-  state.pose.pose.orientation = odom_data->pose.pose.orientation;
+  //Velocity out of Rovio.
   state.pose_diff.twist = odom_data->twist.twist;
-  //Testing.
-  Eigen::Vector4d rovio_quat = arc_tools::transformQuatMessageToEigen(odom_data->pose.pose.orientation);
-  Eigen::Vector3d rovio_euler = arc_tools::transformEulerQuaternionVector(rovio_quat);
-  //update state and path.
+  //Update state and path.
   odomUpdater();
 }
 
 void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
-  //Position out of orbslam (always).
-  state.pose.pose.position = odom_data->pose.pose.position; 
+  //Position (global) out of orbslam.
+  state.pose.pose.position = odom_data->pose.pose.position;
+  //Orientation out of orbslam.
+  //only relative rotation, e.g. substract orient).
+  Eigen::Vector4d quat = arc_tools::transformQuatMessageToEigen(odom_data->pose.pose.orientation);
+  Eigen::Vector4d quat_init_soll(0,0,0,1);
+  Eigen::Vector4d quat_init(CAM_INIT_QUAT_X, CAM_INIT_QUAT_Y, CAM_INIT_QUAT_Z, CAM_INIT_QUAT_W);
+  Eigen::Vector4d quat_init_trafo = arc_tools::diffQuaternion(quat_init, quat_init_soll);
+  Eigen::Vector4d quat_diff = arc_tools::diffQuaternion(quat_init_trafo, quat); 
+  state.pose.pose.orientation =  transformEigenToQuatMessage(quat_diff);
   //Update state and path.
   odomUpdater();
 }
@@ -283,6 +295,8 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
     stream.ignore (300, '|');
     i++;  
   }
+  //Publish teach path for visualization.
+  path_teach_pub.publish(teach_path);
   //Finding last array position and current state.
   int last_array_position = array_position;
   geometry_msgs::Pose last_pose = teach_path.poses[last_array_position].pose;

@@ -1,5 +1,6 @@
 #include "arc_msgs/State.h"
 #include "arc_tools/coordinate_transform.hpp"
+#include "arc_tools/tf_kit.hpp"
 
 #include "Eigen/Dense"
 #include <fstream>
@@ -15,8 +16,6 @@
 #include "nav_msgs/Path.h"
 #include "std_msgs/Bool.h"
 #include "std_msgs/Float64.h"
-#include <tf/transform_broadcaster.h>
-#include <tf/transform_listener.h>
 
 #include "arc_state_estimation/car_model.hpp"
 
@@ -34,8 +33,8 @@ float MAX_VELOCITY_DIVERGENCE;
 float MAX_ABSOLUTE_VELOCITY;
 float MAX_ORIENTATION_DIVERGENCE;
 float MIN_SHUTDOWN_VELOCITY;
-std::string LAST_PATH_FILENAME;
 std::string CURRENT_PATH_FILENAME;
+std::string LAST_PATH_FILENAME;
 std::string MODE_TOPIC;
 std::string PATH_TOPIC;
 std::string SHUTDOWN_TOPIC;
@@ -86,7 +85,6 @@ int searchCurrentArrayPosition(const std::string teach_path_file);
 void shutdownCallback(const std_msgs::Bool::ConstPtr& msg);
 void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg);
 void stopWithReason(std::string reason);
-void tfBroadcaster(const Eigen::Vector4d euler, const Eigen::Vector3d position, std::string tf_name);
 void velocityLeftCallback(const std_msgs::Float64::ConstPtr& msg);
 void velocityRightCallback(const std_msgs::Float64::ConstPtr& msg);
 //Init class objects.
@@ -176,7 +174,7 @@ void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
   Eigen::Vector4d quat_init(CAM_INIT_QUAT_X, CAM_INIT_QUAT_Y, CAM_INIT_QUAT_Z, CAM_INIT_QUAT_W);
   Eigen::Vector4d quat_init_trafo = arc_tools::diffQuaternion(quat_init, quat_init_soll);
   Eigen::Vector4d quat_diff = arc_tools::diffQuaternion(quat_init_trafo, quat); 
-  state.pose.pose.orientation =  transformEigenToQuatMessage(quat_diff);
+  state.pose.pose.orientation =  arc_tools::transformEigenToQuatMessage(quat_diff);
   //Update state and path.
   odomUpdater();
 }
@@ -187,7 +185,7 @@ void odomUpdater(){
   quat = arc_tools::transformQuatMessageToEigen(state.pose.pose.orientation);
   lin_vel = arc_tools::transformVectorMessageToEigen(state.pose_diff.twist.linear);
   ang_vel = arc_tools::transformVectorMessageToEigen(state.pose_diff.twist.angular);
-  tfBroadcaster(quat, position, "vi");
+  arc_tools::tfBroadcaster(quat, position, "odom", "vi");
   //Indexing state: if teach then iterate, if repeat search closest point.
   if(!mode) array_position += 1; 
   if(mode) array_position = searchCurrentArrayPosition(LAST_PATH_FILENAME);
@@ -237,17 +235,6 @@ void velocityRightCallback(const std_msgs::Float64::ConstPtr& msg){
   car_model.set_velocity_right(velocity_right);
   //Updating model.
   car_model.updateModel(quat);
-}
-
-void tfBroadcaster(Eigen::Vector4d quat, Eigen::Vector3d position, std::string tf_name){
-  // Init static broadcaster.
-  static tf::TransformBroadcaster broadcaster;
-  //Set orientation and vector.
-  tf::Quaternion tf_quat(quat(0), quat(1), quat(2), quat(3));
-  tf::Vector3 tf_vector(position(0), position(1), position(2)+0.2);
-  //Setting tf - broadcast from odom to rear_axle.
-  broadcaster.sendTransform(tf::StampedTransform(tf::Transform(tf_quat, tf_vector),
-                           ros::Time::now(), "odom", tf_name));
 }
 
 int searchCurrentArrayPosition(const std::string teach_path_file){

@@ -7,6 +7,7 @@
 #include <iostream>
 #include <ros/ros.h>
 #include <ros/package.h>
+#include <vector>
 #include "geometry_msgs/Point.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/Quaternion.h"
@@ -60,7 +61,6 @@ ros::Publisher path_teach_pub;
 ros::Publisher tracking_error_pub;
 ros::Publisher tracking_error_vel_pub;
 //Path and output file.
-std::ofstream stream;
 arc_msgs::State state;
 int array_position;
 bool stop = false;
@@ -71,8 +71,7 @@ bool mode = false;
 //State as an Eigen::Vector.
 Eigen::Vector3d position;
 Eigen::Vector4d quat;
-Eigen::Vector3d lin_vel;
-Eigen::Vector3d ang_vel;
+double lin_vel;
 //Declaration of functions.
 double calculateDistance(geometry_msgs::Pose base, geometry_msgs::Pose target);
 void closeStateEstimation();
@@ -102,14 +101,14 @@ int main(int argc, char** argv){
   node.getParam("/erod/DISTANCE_WHEEL_AXES", DISTANCE_WHEEL_AXES);
   node.getParam("/erod/LENGTH_WHEEL_AXIS", LENGTH_WHEEL_AXIS);
   node.getParam("/general/QUEUE_LENGTH", QUEUE_LENGTH);
-  node.getParam("/general/CURRENT_ARRAY_SEARCHING_WIDTH", CURRENT_ARRAY_SEARCHING_WIDTH);
+  node.getParam("/control/CURRENT_ARRAY_SEARCHING_WIDTH", CURRENT_ARRAY_SEARCHING_WIDTH);
   node.getParam("/safety/MAX_DEVIATION_FROM_TEACH_PATH", MAX_DEVIATION_FROM_TEACH_PATH);
   node.getParam("/safety/MAX_ORIENTATION_DIVERGENCE", MAX_ORIENTATION_DIVERGENCE);
   node.getParam("/safety/MIN_SHUTDOWN_VELOCITY", MIN_SHUTDOWN_VELOCITY);
   node.getParam("/files/LAST_PATH_FILENAME", LAST_PATH_FILENAME);
   node.getParam("/files/CURRENT_PATH_FILENAME", CURRENT_PATH_FILENAME);
   node.getParam("/topic/STATE", STATE_TOPIC);
-  node.getParam("/topic/STEERING_ANGLE", STEERING_ANGLE_TOPIC);
+  node.getParam("/topic/STATE_STEERING_ANGLE", STEERING_ANGLE_TOPIC);
   node.getParam("/topic/WHEEL_REAR_LEFT", WHEEL_SENSORS_LEFT_TOPIC);
   node.getParam("/topic/WHEEL_REAR_RIGHT", WHEEL_SENSORS_RIGHT_TOPIC);
   node.getParam("/topic/TRACKING_ERROR", TRACKING_ERROR_TOPIC);
@@ -122,15 +121,18 @@ int main(int argc, char** argv){
   initStateEstimation(&node);
   //Spinning.
 	ros::spin();
+  //Close state estimation.
+  closeStateEstimation();
 	return 0;
 }
 
 void initStateEstimation(ros::NodeHandle* node){
-  //Initialise output stream.
-  std::string filename_all = CURRENT_PATH_FILENAME+".txt";
-  stream.open(filename_all.c_str());
   //Initialising path_array.
   array_position = 0;
+  //Empty path txt file.
+  std::string filename_all = CURRENT_PATH_FILENAME+".txt";
+  std::ofstream stream(filename_all.c_str());
+  stream.close();
   // Publisher and subscriber.
   car_model.createPublisher(node);
   left_wheel_sub = node->subscribe(WHEEL_SENSORS_LEFT_TOPIC, QUEUE_LENGTH, velocityLeftCallback);
@@ -150,8 +152,6 @@ void initStateEstimation(ros::NodeHandle* node){
 
 void closeStateEstimation(){
   std::cout << std::endl << "STATE ESTIMATION: Closing" << std::endl;
-  //Closing stream.
-  stream.close();
   //Finishing ros.
   ros::shutdown();
   ros::waitForShutdown();
@@ -159,7 +159,10 @@ void closeStateEstimation(){
 
 void rovioCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
   //Velocity out of Rovio.
-  state.pose_diff.twist = odom_data->twist.twist;
+  double vel_x = odom_data->twist.twist.linear.x;
+  double vel_y = odom_data->twist.twist.linear.y;
+  double vel_z = odom_data->twist.twist.linear.z;
+  state.pose_diff = sqrt(vel_x*vel_x + vel_y*vel_y + vel_z*vel_z);
   //Update state and path.
   odomUpdater();
 }
@@ -183,8 +186,7 @@ void odomUpdater(){
   //Tf broadcasting.
   position = arc_tools::transformPointMessageToEigen(state.pose.pose.position);
   quat = arc_tools::transformQuatMessageToEigen(state.pose.pose.orientation);
-  lin_vel = arc_tools::transformVectorMessageToEigen(state.pose_diff.twist.linear);
-  ang_vel = arc_tools::transformVectorMessageToEigen(state.pose_diff.twist.angular);
+  lin_vel = state.pose_diff;
   arc_tools::tfBroadcaster(quat, position, "odom", "vi");
   //Indexing state: if teach then iterate, if repeat search closest point.
   if(!mode) array_position += 1; 
@@ -197,11 +199,13 @@ void odomUpdater(){
   state_pub.publish(state);
   path_pub.publish(current_path);
   //Writing path File.
+  std::string filename_all = CURRENT_PATH_FILENAME+".txt";
+  std::ofstream stream(filename_all.c_str(), std::ios::out|std::ios::app);
   stream <<array_position<<" "<<
            position(0)<<" "<<position(1)<<" "<<position(2)<<" "<<
            quat(0)<<" "<<quat(1)<<" "<<quat(2)<<" "<<quat(3)<<" "<<
-           lin_vel(0)<<" "<<lin_vel(1)<<" "<<lin_vel(2)<<" "<<
-           ang_vel(0)<<" "<<ang_vel(1)<<" "<<ang_vel(2)<<" "<<stop<<"|";
+           lin_vel <<" "<<stop<<"|";
+  stream.close();
 } 
 
 void modeCallback(const std_msgs::Bool::ConstPtr& msg){
@@ -212,7 +216,7 @@ void shutdownCallback(const std_msgs::Bool::ConstPtr& msg){
   shutdown = msg->data;
   // Shutdown iff velocity is close to zero (control needs state estimation).
   if (shutdown){
-    if (lin_vel.norm() < MIN_SHUTDOWN_VELOCITY) closeStateEstimation();
+    if (abs(lin_vel) < MIN_SHUTDOWN_VELOCITY) closeStateEstimation();
   }
 }
 
@@ -253,33 +257,31 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
   //Copy file.
   char * file = new char [length];
   fin.read (file,length);
-  std::istringstream stream(file,std::ios::in);
+  std::istringstream stream_last(file,std::ios::in);
   delete[] file;  
   fin.close () ;
   //Writing path from file.
   int i=0;
   int array_index;  
   nav_msgs::Path teach_path;
-  nav_msgs::Path teach_path_diff;
-  while(!stream.eof()&& i<length){
+  std::vector<float> teach_diff_vector;
+  while(!stream_last.eof()&& i<length){
     geometry_msgs::PoseStamped temp_pose;
-    geometry_msgs::PoseStamped temp_pose_diff;
-    stream>>array_index;
-    stream>>temp_pose.pose.position.x;
-    stream>>temp_pose.pose.position.y;
-    stream>>temp_pose.pose.position.z;
+    float temp_diff;
+    stream_last>>array_index;
+    stream_last>>temp_pose.pose.position.x;
+    stream_last>>temp_pose.pose.position.y;
+    stream_last>>temp_pose.pose.position.z;
     //Reading teach orientation
-    stream>>temp_pose.pose.orientation.x;
-    stream>>temp_pose.pose.orientation.y;
-    stream>>temp_pose.pose.orientation.z;
-    stream>>temp_pose.pose.orientation.w;
+    stream_last>>temp_pose.pose.orientation.x;
+    stream_last>>temp_pose.pose.orientation.y;
+    stream_last>>temp_pose.pose.orientation.z;
+    stream_last>>temp_pose.pose.orientation.w;
     //Reading teach velocity
-    stream>>temp_pose_diff.pose.position.x;
-    stream>>temp_pose_diff.pose.position.y;
-    stream>>temp_pose_diff.pose.position.z;
+    stream_last>>temp_diff;
     teach_path.poses.push_back(temp_pose);
-    teach_path_diff.poses.push_back(temp_pose_diff);
-    stream.ignore (300, '|');
+    teach_diff_vector.push_back(temp_diff);
+    stream_last.ignore (300, '|');
     i++;  
   }
   //Publish teach path for visualization.
@@ -308,10 +310,10 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
   //1)Check maximal distance.
   if (shortest_distance >= MAX_DEVIATION_FROM_TEACH_PATH) stopWithReason("deviation from teach path");
   //2)Check absolute maximal velocity (only xy direction).
-  float v_abs=sqrt(pow(state.pose_diff.twist.linear.x,2)+pow(state.pose_diff.twist.linear.y,2));
+  float v_abs=state.pose_diff;
   if (v_abs >= MAX_ABSOLUTE_VELOCITY) stopWithReason("absolute velocity");
   //3)Check divergence to teach velocity (only xy direction).
-  float v_teach=sqrt(pow(teach_path_diff.poses[smallest_distance_index].pose.position.x,2)+pow(teach_path_diff.poses[smallest_distance_index].pose.position.y,2));
+  float v_teach=teach_diff_vector[smallest_distance_index];
   if ((v_abs-v_teach)>=MAX_VELOCITY_DIVERGENCE) stopWithReason("velocity divergence");
   //4)Check divergence to teach orientation (normal to plane orientation).
   float current_orientation = arc_tools::transformEulerQuaternionVector(quat)(2);
@@ -325,9 +327,7 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
   tracking_error_pub.publish(shortest_distance_msg);
   //Publish tracking error velocity.
   std_msgs::Float64 velocity_tracking_error_msg;
-  geometry_msgs::Point temp_vel = teach_path_diff.poses[smallest_distance_index].pose.position;
-  Eigen::Vector3d path_vel(temp_vel.x, temp_vel.y, temp_vel.z);
-  velocity_tracking_error_msg.data = (path_vel - lin_vel).norm();
+  velocity_tracking_error_msg.data = abs(v_teach - lin_vel);
   tracking_error_vel_pub.publish(velocity_tracking_error_msg);
   return smallest_distance_index;
 }

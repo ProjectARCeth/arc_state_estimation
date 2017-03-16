@@ -1,7 +1,6 @@
 #ifndef CAR_MODEL_ARC_TOOLS_HPP
 #define CAR_MODEL_ARC_TOOLS_HPP
 
-#include "arc_msgs/State.h"
 #include "arc_tools/coordinate_transform.hpp"
 
 #include <iostream>

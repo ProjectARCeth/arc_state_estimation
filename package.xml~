@@ -27,6 +27,5 @@
 	<run_depend>sensor_msgs</run_depend>
 	<run_depend>catkin_simple</run_depend>
 	<run_depend>eigen_catkin</run_depend>
-	<run_depend>arc_msgs</run_depend>
 	
 </package>

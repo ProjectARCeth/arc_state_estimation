@@ -34,10 +34,11 @@ float MAX_VELOCITY_DIVERGENCE;
 float MAX_ABSOLUTE_VELOCITY;
 float MAX_ORIENTATION_DIVERGENCE;
 float MIN_SHUTDOWN_VELOCITY;
-std::string CURRENT_PATH_FILENAME;
-std::string LAST_PATH_FILENAME;
+std::string PATH_NAME;
 std::string MODE_TOPIC;
+std::string ORB_SLAM_TOPIC;
 std::string PATH_TOPIC;
+std::string ROVIO_TOPIC;
 std::string SHUTDOWN_TOPIC;
 std::string STATE_TOPIC;
 std::string STEERING_ANGLE_TOPIC;
@@ -66,8 +67,8 @@ int array_position;
 bool stop = false;
 bool shutdown = false;
 nav_msgs::Path current_path;
-//Mode: Teach (0) = Default or Repeat (1).
-bool mode = false; 
+//Mode: Teach () = Default or Repeat (1).
+bool mode = true; 
 //State as an Eigen::Vector.
 Eigen::Vector3d position;
 Eigen::Vector4d quat;
@@ -94,6 +95,8 @@ int main(int argc, char** argv){
 	ros::init(argc, argv, "arc_state_estimation");
 	ros::NodeHandle node;
   //Getting parameter.
+  PATH_NAME = *(argv + 1);
+  if(strlen(*(argv + 2)) == 5) mode = false;
   node.getParam("/sensor/CAM_INIT_QUAT_X", CAM_INIT_QUAT_X);
   node.getParam("/sensor/CAM_INIT_QUAT_Y", CAM_INIT_QUAT_Y);
   node.getParam("/sensor/CAM_INIT_QUAT_Z", CAM_INIT_QUAT_Z);
@@ -105,8 +108,8 @@ int main(int argc, char** argv){
   node.getParam("/safety/MAX_DEVIATION_FROM_TEACH_PATH", MAX_DEVIATION_FROM_TEACH_PATH);
   node.getParam("/safety/MAX_ORIENTATION_DIVERGENCE", MAX_ORIENTATION_DIVERGENCE);
   node.getParam("/safety/MIN_SHUTDOWN_VELOCITY", MIN_SHUTDOWN_VELOCITY);
-  node.getParam("/files/LAST_PATH_FILENAME", LAST_PATH_FILENAME);
-  node.getParam("/files/CURRENT_PATH_FILENAME", CURRENT_PATH_FILENAME);
+  node.getParam("/topic/ORB_SLAM_ODOMETRY", ORB_SLAM_TOPIC);
+  node.getParam("/topic/ROVIO_ODOMETRY", ROVIO_TOPIC);
   node.getParam("/topic/STATE", STATE_TOPIC);
   node.getParam("/topic/STATE_STEERING_ANGLE", STEERING_ANGLE_TOPIC);
   node.getParam("/topic/WHEEL_REAR_LEFT", WHEEL_SENSORS_LEFT_TOPIC);
@@ -129,25 +132,31 @@ int main(int argc, char** argv){
 void initStateEstimation(ros::NodeHandle* node){
   //Initialising path_array.
   array_position = 0;
-  //Empty path txt file.
-  std::string filename_all = CURRENT_PATH_FILENAME+".txt";
-  std::ofstream stream(filename_all.c_str());
-  stream.close();
+  //Empty repeat path txt file.
+  if(mode){
+      std::string filename_all = PATH_NAME + "_repeat.txt";
+      std::ofstream stream(filename_all.c_str());
+      stream.close();
+  }
+  if(!mode){
+      std::string filename_all = PATH_NAME + "_teach.txt";
+      std::ofstream stream(filename_all.c_str());
+      stream.close();
+  }
   // Publisher and subscriber.
   car_model.createPublisher(node);
   left_wheel_sub = node->subscribe(WHEEL_SENSORS_LEFT_TOPIC, QUEUE_LENGTH, velocityLeftCallback);
   mode_sub = node->subscribe(MODE_TOPIC, QUEUE_LENGTH, modeCallback);
-  orb_sub = node->subscribe("orb_slam2/odometry", QUEUE_LENGTH, orbslamCallback);
+  orb_sub = node->subscribe(ORB_SLAM_TOPIC, QUEUE_LENGTH, orbslamCallback);
   right_wheel_sub = node->subscribe(WHEEL_SENSORS_RIGHT_TOPIC, QUEUE_LENGTH, velocityRightCallback);
-  rov_sub = node->subscribe("rovio/odometry", QUEUE_LENGTH, rovioCallback);
+  rov_sub = node->subscribe(ROVIO_TOPIC, QUEUE_LENGTH, rovioCallback);
   shutdown_sub = node->subscribe(SHUTDOWN_TOPIC, QUEUE_LENGTH, shutdownCallback);
   steering_sub = node->subscribe(STEERING_ANGLE_TOPIC, QUEUE_LENGTH, steeringAngleCallback);
   path_pub = node->advertise<nav_msgs::Path>(PATH_TOPIC, QUEUE_LENGTH);
   path_teach_pub = node->advertise<nav_msgs::Path>(TEACH_PATH_TOPIC, QUEUE_LENGTH);
   state_pub = node->advertise<arc_msgs::State>(STATE_TOPIC, QUEUE_LENGTH);
   tracking_error_pub = node->advertise<std_msgs::Float64>(TRACKING_ERROR_TOPIC, QUEUE_LENGTH);
-  tracking_error_vel_pub = node->advertise<std_msgs::Float64>(TRACKING_VEL_ERROR_TOPIC, QUEUE_LENGTH);
-  std::cout << std::endl << "STATE ESTIMATION: Initialised" << std::endl;  
+  tracking_error_vel_pub = node->advertise<std_msgs::Float64>(TRACKING_VEL_ERROR_TOPIC, QUEUE_LENGTH); 
 }
 
 void closeStateEstimation(){
@@ -190,16 +199,18 @@ void odomUpdater(){
   arc_tools::tfBroadcaster(quat, position, "odom", "vi");
   //Indexing state: if teach then iterate, if repeat search closest point.
   if(!mode) array_position += 1; 
-  if(mode) array_position = searchCurrentArrayPosition(LAST_PATH_FILENAME);
+  if(mode) array_position = searchCurrentArrayPosition(PATH_NAME + "_teach.txt");
   //Updating state.
   state.stop = stop;
   state.current_arrayposition = array_position;
   current_path.poses.push_back(state.pose);
-  //Publishing.
+  //Publishing (path for visualisation).
   state_pub.publish(state);
   path_pub.publish(current_path);
   //Writing path File.
-  std::string filename_all = CURRENT_PATH_FILENAME+".txt";
+  std::string filename_all;
+  if(mode) filename_all = PATH_NAME + "_repeat.txt";
+  if(!mode) filename_all = PATH_NAME + "_teach.txt";
   std::ofstream stream(filename_all.c_str(), std::ios::out|std::ios::app);
   stream <<array_position<<" "<<
            position(0)<<" "<<position(1)<<" "<<position(2)<<" "<<
@@ -287,6 +298,7 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
   //Publish teach path for visualization.
   path_teach_pub.publish(teach_path);
   //Finding last array position and current state.
+  int path_length = i;
   int last_array_position = array_position;
   geometry_msgs::Pose last_pose = teach_path.poses[last_array_position].pose;
   geometry_msgs::Pose pose = state.pose.pose;
@@ -299,7 +311,9 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
   //Searching closest point.
   double shortest_distance = MAX_DEVIATION_FROM_TEACH_PATH;
   int smallest_distance_index = last_array_position;
-  for (int s = last_array_position-max_index; s < last_array_position+max_index; s++){
+  int lower_searching_bound = std::max(0, last_array_position-max_index);
+  int upper_searching_bound = std::min(path_length,last_array_position+max_index);
+  for (int s = lower_searching_bound; s < upper_searching_bound; s++){
     double current_distance = calculateDistance(pose, teach_path.poses[s].pose);
     if (current_distance < shortest_distance){
       shortest_distance = current_distance;

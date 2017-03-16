@@ -35,7 +35,6 @@ float MAX_ABSOLUTE_VELOCITY;
 float MAX_ORIENTATION_DIVERGENCE;
 float MIN_SHUTDOWN_VELOCITY;
 std::string PATH_NAME;
-std::string MODE_TOPIC;
 std::string ORB_SLAM_TOPIC;
 std::string PATH_TOPIC;
 std::string ROVIO_TOPIC;
@@ -49,7 +48,6 @@ std::string WHEEL_SENSORS_LEFT_TOPIC;
 std::string WHEEL_SENSORS_RIGHT_TOPIC;
 //Subcriber and publisher.
 ros::Subscriber left_wheel_sub;
-ros::Subscriber mode_sub;
 ros::Subscriber rov_sub;
 ros::Subscriber orb_sub;
 ros::Subscriber right_wheel_sub;
@@ -77,7 +75,6 @@ double lin_vel;
 double calculateDistance(geometry_msgs::Pose base, geometry_msgs::Pose target);
 void closeStateEstimation();
 void initStateEstimation(ros::NodeHandle* node);
-void modeCallback(const std_msgs::Bool::ConstPtr& msg);
 void odomUpdater();
 void orbslamCallback(const nav_msgs::Odometry::ConstPtr& odom_data);
 void rovioCallback(const nav_msgs::Odometry::ConstPtr& odom_data);
@@ -116,7 +113,6 @@ int main(int argc, char** argv){
   node.getParam("/topic/WHEEL_REAR_RIGHT", WHEEL_SENSORS_RIGHT_TOPIC);
   node.getParam("/topic/TRACKING_ERROR", TRACKING_ERROR_TOPIC);
   node.getParam("/topic/TRACKING_ERROR_VELOCITY", TRACKING_VEL_ERROR_TOPIC);
-  node.getParam("/topic/MODE", MODE_TOPIC);
   node.getParam("/topic/PATH", PATH_TOPIC);
   node.getParam("/topic/TEACH_PATH", TEACH_PATH_TOPIC);
   node.getParam("/topic/SHUTDOWN", SHUTDOWN_TOPIC);
@@ -146,7 +142,6 @@ void initStateEstimation(ros::NodeHandle* node){
   // Publisher and subscriber.
   car_model.createPublisher(node);
   left_wheel_sub = node->subscribe(WHEEL_SENSORS_LEFT_TOPIC, QUEUE_LENGTH, velocityLeftCallback);
-  mode_sub = node->subscribe(MODE_TOPIC, QUEUE_LENGTH, modeCallback);
   orb_sub = node->subscribe(ORB_SLAM_TOPIC, QUEUE_LENGTH, orbslamCallback);
   right_wheel_sub = node->subscribe(WHEEL_SENSORS_RIGHT_TOPIC, QUEUE_LENGTH, velocityRightCallback);
   rov_sub = node->subscribe(ROVIO_TOPIC, QUEUE_LENGTH, rovioCallback);
@@ -218,10 +213,6 @@ void odomUpdater(){
            lin_vel <<" "<<stop<<"|";
   stream.close();
 } 
-
-void modeCallback(const std_msgs::Bool::ConstPtr& msg){
-  mode = msg->data;
-}
 
 void shutdownCallback(const std_msgs::Bool::ConstPtr& msg){
   shutdown = msg->data;

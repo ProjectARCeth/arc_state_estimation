@@ -30,7 +30,6 @@ float LENGTH_WHEEL_AXIS;
 int QUEUE_LENGTH;
 float CURRENT_ARRAY_SEARCHING_WIDTH;
 float MAX_DEVIATION_FROM_TEACH_PATH;
-float MAX_VELOCITY_DIVERGENCE;
 float MAX_ABSOLUTE_VELOCITY;
 float MAX_ORIENTATION_DIVERGENCE;
 float MIN_SHUTDOWN_VELOCITY;
@@ -102,6 +101,7 @@ int main(int argc, char** argv){
   node.getParam("/erod/LENGTH_WHEEL_AXIS", LENGTH_WHEEL_AXIS);
   node.getParam("/general/QUEUE_LENGTH", QUEUE_LENGTH);
   node.getParam("/control/CURRENT_ARRAY_SEARCHING_WIDTH", CURRENT_ARRAY_SEARCHING_WIDTH);
+  node.getParam("/safety/MAX_ABSOLUTE_VELOCITY", MAX_ABSOLUTE_VELOCITY);
   node.getParam("/safety/MAX_DEVIATION_FROM_TEACH_PATH", MAX_DEVIATION_FROM_TEACH_PATH);
   node.getParam("/safety/MAX_ORIENTATION_DIVERGENCE", MAX_ORIENTATION_DIVERGENCE);
   node.getParam("/safety/MIN_SHUTDOWN_VELOCITY", MIN_SHUTDOWN_VELOCITY);
@@ -312,15 +312,13 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
     }
   }
   //Checkliste safety.
+  float v_abs=state.pose_diff;
+  float v_teach=teach_diff_vector[smallest_distance_index];
   //1)Check maximal distance.
   if (shortest_distance >= MAX_DEVIATION_FROM_TEACH_PATH) stopWithReason("deviation from teach path");
   //2)Check absolute maximal velocity (only xy direction).
-  float v_abs=state.pose_diff;
   if (v_abs >= MAX_ABSOLUTE_VELOCITY) stopWithReason("absolute velocity");
-  //3)Check divergence to teach velocity (only xy direction).
-  float v_teach=teach_diff_vector[smallest_distance_index];
-  if ((v_abs-v_teach)>=MAX_VELOCITY_DIVERGENCE) stopWithReason("velocity divergence");
-  //4)Check divergence to teach orientation (normal to plane orientation).
+  //3)Check divergence to teach orientation (normal to plane orientation).
   float current_orientation = arc_tools::transformEulerQuaternionVector(quat)(2);
   Eigen::Vector4d path_quat = arc_tools::transformQuatMessageToEigen(teach_path.poses[smallest_distance_index].pose.orientation);
   float path_orientation = arc_tools::transformEulerQuaternionVector(path_quat)(2);

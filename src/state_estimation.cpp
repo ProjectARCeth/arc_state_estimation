@@ -126,8 +126,6 @@ int main(int argc, char** argv){
 }
 
 void initStateEstimation(ros::NodeHandle* node){
-  //Initialising path_array.
-  array_position = 0;
   //Empty repeat path txt file.
   if(mode){
       std::string filename_all = PATH_NAME + "_repeat.txt";
@@ -139,6 +137,11 @@ void initStateEstimation(ros::NodeHandle* node){
       std::ofstream stream(filename_all.c_str());
       stream.close();
   }
+  //Init state.
+  position = Eigen::Vector3d(0,0,0);
+  quat = Eigen::Vector4d(0,0,0,1);
+  lin_vel = 0.0;
+  array_position = 0;
   // Publisher and subscriber.
   car_model.createPublisher(node);
   left_wheel_sub = node->subscribe(WHEEL_SENSORS_LEFT_TOPIC, QUEUE_LENGTH, velocityLeftCallback);

@@ -64,6 +64,9 @@ int array_position;
 bool stop = false;
 bool shutdown = false;
 nav_msgs::Path current_path;
+nav_msgs::Path teach_path;
+std::vector<float> teach_diff_vector;
+int teach_path_length;
 //Mode: Teach () = Default or Repeat (1).
 bool mode = true; 
 //State as an Eigen::Vector.
@@ -76,8 +79,9 @@ void closeStateEstimation();
 void initStateEstimation(ros::NodeHandle* node);
 void odomUpdater();
 void orbslamCallback(const nav_msgs::Odometry::ConstPtr& odom_data);
+void readPathFile(const std::string teach_path_file);
 void rovioCallback(const nav_msgs::Odometry::ConstPtr& odom_data);
-int searchCurrentArrayPosition(const std::string teach_path_file); 
+int searchCurrentArrayPosition(); 
 void shutdownCallback(const std_msgs::Bool::ConstPtr& msg);
 void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg);
 void stopWithReason(std::string reason);
@@ -125,6 +129,25 @@ int main(int argc, char** argv){
 	return 0;
 }
 
+double calculateDistance(geometry_msgs::Pose base, geometry_msgs::Pose target){
+  double x_base = base.position.x;
+  double y_base = base.position.y;
+  double z_base = base.position.z;
+  double x_target = target.position.x;
+  double y_target = target.position.y;
+  double z_target = target.position.z;
+  double distance = sqrt((x_base-x_target)*(x_base-x_target) + 
+                        (y_base-y_target)*(y_base-y_target) + (z_base-z_target)*(z_base-z_target));
+  return distance;
+}
+
+void closeStateEstimation(){
+  std::cout << std::endl << "STATE ESTIMATION: Closing" << std::endl;
+  //Finishing ros.
+  ros::shutdown();
+  ros::waitForShutdown();
+}
+
 void initStateEstimation(ros::NodeHandle* node){
   //Empty repeat path txt file.
   if(mode){
@@ -137,11 +160,14 @@ void initStateEstimation(ros::NodeHandle* node){
       std::ofstream stream(filename_all.c_str());
       stream.close();
   }
+  //Read teach txt path file.
+  if(mode) readPathFile(PATH_NAME + "_teach.txt");
   //Init state.
   position = Eigen::Vector3d(0,0,0);
   quat = Eigen::Vector4d(0,0,0,1);
   lin_vel = 0.0;
   array_position = 0;
+  current_path.header.frame_id = "current_path";
   // Publisher and subscriber.
   car_model.createPublisher(node);
   left_wheel_sub = node->subscribe(WHEEL_SENSORS_LEFT_TOPIC, QUEUE_LENGTH, velocityLeftCallback);
@@ -157,38 +183,6 @@ void initStateEstimation(ros::NodeHandle* node){
   tracking_error_vel_pub = node->advertise<std_msgs::Float64>(TRACKING_VEL_ERROR_TOPIC, QUEUE_LENGTH); 
 }
 
-void closeStateEstimation(){
-  std::cout << std::endl << "STATE ESTIMATION: Closing" << std::endl;
-  //Finishing ros.
-  ros::shutdown();
-  ros::waitForShutdown();
-}
-
-void rovioCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
-  //Velocity out of Rovio.
-  double vel_x = odom_data->twist.twist.linear.x;
-  double vel_y = odom_data->twist.twist.linear.y;
-  double vel_z = odom_data->twist.twist.linear.z;
-  state.pose_diff = sqrt(vel_x*vel_x + vel_y*vel_y + vel_z*vel_z);
-  //Update state and path.
-  odomUpdater();
-}
-
-void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
-  //Position (global) out of orbslam.
-  state.pose.pose.position = odom_data->pose.pose.position;
-  //Orientation out of orbslam.
-  //only relative rotation, e.g. substract orient).
-  Eigen::Vector4d quat = arc_tools::transformQuatMessageToEigen(odom_data->pose.pose.orientation);
-  Eigen::Vector4d quat_init_soll(0,0,0,1);
-  Eigen::Vector4d quat_init(CAM_INIT_QUAT_X, CAM_INIT_QUAT_Y, CAM_INIT_QUAT_Z, CAM_INIT_QUAT_W);
-  Eigen::Vector4d quat_init_trafo = arc_tools::diffQuaternion(quat_init, quat_init_soll);
-  Eigen::Vector4d quat_diff = arc_tools::diffQuaternion(quat_init_trafo, quat); 
-  state.pose.pose.orientation =  arc_tools::transformEigenToQuatMessage(quat_diff);
-  //Update state and path.
-  odomUpdater();
-}
-
 void odomUpdater(){
   //Tf broadcasting.
   position = arc_tools::transformPointMessageToEigen(state.pose.pose.position);
@@ -197,7 +191,7 @@ void odomUpdater(){
   arc_tools::tfBroadcaster(quat, position, "odom", "vi");
   //Indexing state: if teach then iterate, if repeat search closest point.
   if(!mode) array_position += 1; 
-  if(mode) array_position = searchCurrentArrayPosition(PATH_NAME + "_teach.txt");
+  if(mode) array_position = searchCurrentArrayPosition();
   //Updating state.
   state.stop = stop;
   state.current_arrayposition = array_position;
@@ -215,39 +209,24 @@ void odomUpdater(){
            quat(0)<<" "<<quat(1)<<" "<<quat(2)<<" "<<quat(3)<<" "<<
            lin_vel <<" "<<stop<<"|";
   stream.close();
-} 
-
-void shutdownCallback(const std_msgs::Bool::ConstPtr& msg){
-  shutdown = msg->data;
-  // Shutdown iff velocity is close to zero (control needs state estimation).
-  if (shutdown){
-    if (abs(lin_vel) < MIN_SHUTDOWN_VELOCITY) closeStateEstimation();
-  }
 }
 
-void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg){
-  float steering_angle = msg->data;
-  car_model.set_steering_angle(steering_angle);
-  //Updating model.
-  car_model.updateModel(quat);
+void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
+  //Position (global) out of orbslam.
+  state.pose.pose.position = odom_data->pose.pose.position;
+  //Orientation out of orbslam.
+  //only relative rotation, e.g. substract orient).
+  Eigen::Vector4d quat = arc_tools::transformQuatMessageToEigen(odom_data->pose.pose.orientation);
+  Eigen::Vector4d quat_init_soll(0,0,0,1);
+  Eigen::Vector4d quat_init(CAM_INIT_QUAT_X, CAM_INIT_QUAT_Y, CAM_INIT_QUAT_Z, CAM_INIT_QUAT_W);
+  Eigen::Vector4d quat_init_trafo = arc_tools::diffQuaternion(quat_init, quat_init_soll);
+  Eigen::Vector4d quat_diff = arc_tools::diffQuaternion(quat_init_trafo, quat); 
+  state.pose.pose.orientation =  arc_tools::transformEigenToQuatMessage(quat_diff);
+  //Update state and path.
+  odomUpdater();
 }
 
-void velocityLeftCallback(const std_msgs::Float64::ConstPtr& msg){
-  float velocity_left = msg->data;
-  car_model.set_velocity_left(velocity_left);
-  //Updating model.
-  car_model.updateModel(quat);
-}
-
-void velocityRightCallback(const std_msgs::Float64::ConstPtr& msg){
-  float velocity_right = msg->data;
-  car_model.set_velocity_right(velocity_right);
-  //Updating model.
-  car_model.updateModel(quat);
-}
-
-int searchCurrentArrayPosition(const std::string teach_path_file){
-  //Read in teach_path.
+void readPathFile(const std::string teach_path_file){
   //Open stream.
   std::fstream fin;
   fin.open(teach_path_file.c_str());
@@ -268,8 +247,6 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
   //Writing path from file.
   int i=0;
   int array_index;  
-  nav_msgs::Path teach_path;
-  std::vector<float> teach_diff_vector;
   while(!stream_last.eof()&& i<length){
     geometry_msgs::PoseStamped temp_pose;
     float temp_diff;
@@ -290,9 +267,39 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
     i++;  
   }
   //Publish teach path for visualization.
+  teach_path.header.frame_id = "teach_path";
   path_teach_pub.publish(teach_path);
+  //Read out path length.
+  teach_path_length = i;
+}
+
+void rovioCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
+  //Velocity out of Rovio.
+  double vel_x = odom_data->twist.twist.linear.x;
+  double vel_y = odom_data->twist.twist.linear.y;
+  double vel_z = odom_data->twist.twist.linear.z;
+  state.pose_diff = sqrt(vel_x*vel_x + vel_y*vel_y + vel_z*vel_z);
+  //Update state and path.
+  odomUpdater();
+} 
+
+void shutdownCallback(const std_msgs::Bool::ConstPtr& msg){
+  shutdown = msg->data;
+  // Shutdown iff velocity is close to zero (control needs state estimation).
+  if (shutdown){
+    if (abs(lin_vel) < MIN_SHUTDOWN_VELOCITY) closeStateEstimation();
+  }
+}
+
+void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg){
+  float steering_angle = msg->data;
+  car_model.set_steering_angle(steering_angle);
+  //Updating model.
+  car_model.updateModel(quat);
+}
+
+int searchCurrentArrayPosition(){
   //Finding last array position and current state.
-  int path_length = i;
   int last_array_position = array_position;
   geometry_msgs::Pose last_pose = teach_path.poses[last_array_position].pose;
   geometry_msgs::Pose pose = state.pose.pose;
@@ -306,7 +313,7 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
   double shortest_distance = MAX_DEVIATION_FROM_TEACH_PATH;
   int smallest_distance_index = last_array_position;
   int lower_searching_bound = std::max(0, last_array_position-max_index);
-  int upper_searching_bound = std::min(path_length,last_array_position+max_index);
+  int upper_searching_bound = std::min(teach_path_length,last_array_position+max_index);
   for (int s = lower_searching_bound; s < upper_searching_bound; s++){
     double current_distance = calculateDistance(pose, teach_path.poses[s].pose);
     if (current_distance < shortest_distance){
@@ -338,16 +345,18 @@ int searchCurrentArrayPosition(const std::string teach_path_file){
   return smallest_distance_index;
 }
 
-double calculateDistance(geometry_msgs::Pose base, geometry_msgs::Pose target){
-  double x_base = base.position.x;
-  double y_base = base.position.y;
-  double z_base = base.position.z;
-  double x_target = target.position.x;
-  double y_target = target.position.y;
-  double z_target = target.position.z;
-  double distance = sqrt((x_base-x_target)*(x_base-x_target) + 
-                        (y_base-y_target)*(y_base-y_target) + (z_base-z_target)*(z_base-z_target));
-  return distance;
+void velocityLeftCallback(const std_msgs::Float64::ConstPtr& msg){
+  float velocity_left = msg->data;
+  car_model.set_velocity_left(velocity_left);
+  //Updating model.
+  car_model.updateModel(quat);
+}
+
+void velocityRightCallback(const std_msgs::Float64::ConstPtr& msg){
+  float velocity_right = msg->data;
+  car_model.set_velocity_right(velocity_right);
+  //Updating model.
+  car_model.updateModel(quat);
 }
 
 void stopWithReason(std::string reason){

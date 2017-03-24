@@ -122,6 +122,8 @@ int main(int argc, char** argv){
   node.getParam("/topic/SHUTDOWN", SHUTDOWN_TOPIC);
   // Initialising.
   initStateEstimation(&node);
+  //Read teach txt path file.
+  if(mode) readPathFile(PATH_NAME + "_teach.txt");
   //Spinning.
 	ros::spin();
   //Close state estimation.
@@ -160,8 +162,6 @@ void initStateEstimation(ros::NodeHandle* node){
       std::ofstream stream(filename_all.c_str());
       stream.close();
   }
-  //Read teach txt path file.
-  if(mode) readPathFile(PATH_NAME + "_teach.txt");
   //Init state.
   position = Eigen::Vector3d(0,0,0);
   quat = Eigen::Vector4d(0,0,0,1);

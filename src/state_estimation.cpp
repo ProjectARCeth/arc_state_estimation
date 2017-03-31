@@ -32,12 +32,10 @@ float CURRENT_ARRAY_SEARCHING_WIDTH;
 float MAX_DEVIATION_FROM_TEACH_PATH;
 float MAX_ABSOLUTE_VELOCITY;
 float MAX_ORIENTATION_DIVERGENCE;
-float MIN_SHUTDOWN_VELOCITY;
 std::string PATH_NAME;
 std::string ORB_SLAM_TOPIC;
 std::string PATH_TOPIC;
 std::string ROVIO_TOPIC;
-std::string SHUTDOWN_TOPIC;
 std::string STATE_TOPIC;
 std::string STEERING_ANGLE_TOPIC;
 std::string TEACH_PATH_TOPIC;
@@ -51,7 +49,6 @@ ros::Subscriber rov_sub;
 ros::Subscriber orb_sub;
 ros::Subscriber right_wheel_sub;
 ros::Subscriber steering_sub;
-ros::Subscriber shutdown_sub;
 ros::Subscriber stop_sub;
 ros::Publisher path_pub;
 ros::Publisher state_pub;
@@ -62,7 +59,6 @@ ros::Publisher tracking_error_vel_pub;
 arc_msgs::State state;
 int array_position;
 bool stop = false;
-bool shutdown = false;
 nav_msgs::Path current_path;
 nav_msgs::Path teach_path;
 std::vector<float> teach_diff_vector;
@@ -82,7 +78,6 @@ void orbslamCallback(const nav_msgs::Odometry::ConstPtr& odom_data);
 void readPathFile(const std::string teach_path_file);
 void rovioCallback(const nav_msgs::Odometry::ConstPtr& odom_data);
 int searchCurrentArrayPosition(); 
-void shutdownCallback(const std_msgs::Bool::ConstPtr& msg);
 void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg);
 void stopWithReason(std::string reason);
 void velocityLeftCallback(const std_msgs::Float64::ConstPtr& msg);
@@ -108,7 +103,6 @@ int main(int argc, char** argv){
   node.getParam("/safety/MAX_ABSOLUTE_VELOCITY", MAX_ABSOLUTE_VELOCITY);
   node.getParam("/safety/MAX_DEVIATION_FROM_TEACH_PATH", MAX_DEVIATION_FROM_TEACH_PATH);
   node.getParam("/safety/MAX_ORIENTATION_DIVERGENCE", MAX_ORIENTATION_DIVERGENCE);
-  node.getParam("/safety/MIN_SHUTDOWN_VELOCITY", MIN_SHUTDOWN_VELOCITY);
   node.getParam("/topic/ORB_SLAM_ODOMETRY", ORB_SLAM_TOPIC);
   node.getParam("/topic/ROVIO_ODOMETRY", ROVIO_TOPIC);
   node.getParam("/topic/STATE", STATE_TOPIC);
@@ -119,7 +113,6 @@ int main(int argc, char** argv){
   node.getParam("/topic/TRACKING_ERROR_VELOCITY", TRACKING_VEL_ERROR_TOPIC);
   node.getParam("/topic/PATH", PATH_TOPIC);
   node.getParam("/topic/TEACH_PATH", TEACH_PATH_TOPIC);
-  node.getParam("/topic/SHUTDOWN", SHUTDOWN_TOPIC);
   // Initialising.
   initStateEstimation(&node);
   //Read teach txt path file.
@@ -174,7 +167,6 @@ void initStateEstimation(ros::NodeHandle* node){
   orb_sub = node->subscribe(ORB_SLAM_TOPIC, QUEUE_LENGTH, orbslamCallback);
   right_wheel_sub = node->subscribe(WHEEL_SENSORS_RIGHT_TOPIC, QUEUE_LENGTH, velocityRightCallback);
   rov_sub = node->subscribe(ROVIO_TOPIC, QUEUE_LENGTH, rovioCallback);
-  shutdown_sub = node->subscribe(SHUTDOWN_TOPIC, QUEUE_LENGTH, shutdownCallback);
   steering_sub = node->subscribe(STEERING_ANGLE_TOPIC, QUEUE_LENGTH, steeringAngleCallback);
   path_pub = node->advertise<nav_msgs::Path>(PATH_TOPIC, QUEUE_LENGTH);
   path_teach_pub = node->advertise<nav_msgs::Path>(TEACH_PATH_TOPIC, QUEUE_LENGTH);
@@ -283,13 +275,6 @@ void rovioCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
   odomUpdater();
 } 
 
-void shutdownCallback(const std_msgs::Bool::ConstPtr& msg){
-  shutdown = msg->data;
-  // Shutdown iff velocity is close to zero (control needs state estimation).
-  if (shutdown){
-    if (abs(lin_vel) < MIN_SHUTDOWN_VELOCITY) closeStateEstimation();
-  }
-}
 
 void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg){
   float steering_angle = msg->data;

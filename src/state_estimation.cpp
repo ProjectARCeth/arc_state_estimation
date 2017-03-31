@@ -32,6 +32,7 @@ float CURRENT_ARRAY_SEARCHING_WIDTH;
 float MAX_DEVIATION_FROM_TEACH_PATH;
 float MAX_ABSOLUTE_VELOCITY;
 float MAX_ORIENTATION_DIVERGENCE;
+std::string CAR_MODEL_VELOCITY_TOPIC;
 std::string PATH_NAME;
 std::string ORB_SLAM_TOPIC;
 std::string PATH_TOPIC;
@@ -44,8 +45,8 @@ std::string TRACKING_VEL_ERROR_TOPIC;
 std::string WHEEL_SENSORS_LEFT_TOPIC;
 std::string WHEEL_SENSORS_RIGHT_TOPIC;
 //Subcriber and publisher.
+ros::Subscriber car_model_sub;
 ros::Subscriber left_wheel_sub;
-ros::Subscriber rov_sub;
 ros::Subscriber orb_sub;
 ros::Subscriber right_wheel_sub;
 ros::Subscriber steering_sub;
@@ -73,10 +74,10 @@ double lin_vel;
 double calculateDistance(geometry_msgs::Pose base, geometry_msgs::Pose target);
 void closeStateEstimation();
 void initStateEstimation(ros::NodeHandle* node);
+void modelCallback(const geometry_msgs::TwistWithCovarianceStamped::ConstPtr msg);
 void odomUpdater();
 void orbslamCallback(const nav_msgs::Odometry::ConstPtr& odom_data);
 void readPathFile(const std::string teach_path_file);
-void rovioCallback(const nav_msgs::Odometry::ConstPtr& odom_data);
 int searchCurrentArrayPosition(); 
 void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg);
 void stopWithReason(std::string reason);
@@ -103,8 +104,8 @@ int main(int argc, char** argv){
   node.getParam("/safety/MAX_ABSOLUTE_VELOCITY", MAX_ABSOLUTE_VELOCITY);
   node.getParam("/safety/MAX_DEVIATION_FROM_TEACH_PATH", MAX_DEVIATION_FROM_TEACH_PATH);
   node.getParam("/safety/MAX_ORIENTATION_DIVERGENCE", MAX_ORIENTATION_DIVERGENCE);
+  node.getParam("/topic/CAR_MODEL_VELOCITY", CAR_MODEL_VELOCITY_TOPIC);
   node.getParam("/topic/ORB_SLAM_ODOMETRY", ORB_SLAM_TOPIC);
-  node.getParam("/topic/ROVIO_ODOMETRY", ROVIO_TOPIC);
   node.getParam("/topic/STATE", STATE_TOPIC);
   node.getParam("/topic/STATE_STEERING_ANGLE", STEERING_ANGLE_TOPIC);
   node.getParam("/topic/WHEEL_REAR_LEFT", WHEEL_SENSORS_LEFT_TOPIC);
@@ -163,16 +164,26 @@ void initStateEstimation(ros::NodeHandle* node){
   current_path.header.frame_id = "current_path";
   // Publisher and subscriber.
   car_model.createPublisher(node);
+  car_model_sub = node->subscribe(CAR_MODEL_VELOCITY_TOPIC, QUEUE_LENGTH, modelCallback);
   left_wheel_sub = node->subscribe(WHEEL_SENSORS_LEFT_TOPIC, QUEUE_LENGTH, velocityLeftCallback);
   orb_sub = node->subscribe(ORB_SLAM_TOPIC, QUEUE_LENGTH, orbslamCallback);
   right_wheel_sub = node->subscribe(WHEEL_SENSORS_RIGHT_TOPIC, QUEUE_LENGTH, velocityRightCallback);
-  rov_sub = node->subscribe(ROVIO_TOPIC, QUEUE_LENGTH, rovioCallback);
   steering_sub = node->subscribe(STEERING_ANGLE_TOPIC, QUEUE_LENGTH, steeringAngleCallback);
   path_pub = node->advertise<nav_msgs::Path>(PATH_TOPIC, QUEUE_LENGTH);
   path_teach_pub = node->advertise<nav_msgs::Path>(TEACH_PATH_TOPIC, QUEUE_LENGTH);
   state_pub = node->advertise<arc_msgs::State>(STATE_TOPIC, QUEUE_LENGTH);
   tracking_error_pub = node->advertise<std_msgs::Float64>(TRACKING_ERROR_TOPIC, QUEUE_LENGTH);
   tracking_error_vel_pub = node->advertise<std_msgs::Float64>(TRACKING_VEL_ERROR_TOPIC, QUEUE_LENGTH); 
+}
+
+void modelCallback(const geometry_msgs::TwistWithCovarianceStamped::ConstPtr msg){
+  //Velocity out of Car Model.
+  double vel_x = msg->twist.twist.linear.x;
+  double vel_y = msg->twist.twist.linear.y;
+  double vel_z = msg->twist.twist.linear.z;
+  state.pose_diff = sqrt(vel_x*vel_x + vel_y*vel_y + vel_z*vel_z);
+  //Update state and path.
+  odomUpdater();
 }
 
 void odomUpdater(){
@@ -264,17 +275,6 @@ void readPathFile(const std::string teach_path_file){
   //Read out path length.
   teach_path_length = i;
 }
-
-void rovioCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
-  //Velocity out of Rovio.
-  double vel_x = odom_data->twist.twist.linear.x;
-  double vel_y = odom_data->twist.twist.linear.y;
-  double vel_z = odom_data->twist.twist.linear.z;
-  state.pose_diff = sqrt(vel_x*vel_x + vel_y*vel_y + vel_z*vel_z);
-  //Update state and path.
-  odomUpdater();
-} 
-
 
 void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg){
   float steering_angle = msg->data;

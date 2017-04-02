@@ -188,6 +188,7 @@ void odomUpdater(){
   //Publishing (path for visualisation).
   state_pub.publish(state);
   path_pub.publish(current_path);
+  path_teach_pub.publish(teach_path);
   //Writing path File.
   std::string filename_all;
   if(mode) filename_all = PATH_NAME + "_repeat.txt";

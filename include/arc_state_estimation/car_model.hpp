@@ -18,9 +18,10 @@ public:
 	CarModel(float distance_wheels, float length_axis);
 	void createPublisher(ros::NodeHandle* node);
 	void updateModel(Eigen::Vector4d orientation);
-	void set_steering_angle(float steering_angle);
-	void set_velocity_left(float velocity_left);
-	void set_velocity_right(float velocity_right);
+	double getVelocity();
+	void setSteeringAngle(float steering_angle);
+	void setVelocityLeft(float velocity_left);
+	void setVelocityRight(float velocity_right);
 
 private:
 	ros::Publisher pub_velocity_;

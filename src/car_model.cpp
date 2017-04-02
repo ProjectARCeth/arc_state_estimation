@@ -14,6 +14,17 @@ void CarModel::createPublisher(ros::NodeHandle* node){
     pub_velocity_ = node->advertise<geometry_msgs::TwistWithCovarianceStamped>(topic, 10);
 }
 
+double CarModel::getVelocity(){
+    double mean_velocity = (velocity_left_ + velocity_right_)/2.0;
+    return mean_velocity;
+}
+
+void CarModel::setSteeringAngle(float steering_angle){steering_angle_ = steering_angle;}
+
+void CarModel::setVelocityLeft(float velocity_left){velocity_left_ = velocity_left;}
+
+void CarModel::setVelocityRight(float velocity_right){velocity_right_ = velocity_right;}
+
 void CarModel::updateModel(Eigen::Vector4d orientation){
     //Geometric calculations: Equal angular velocities and current center of rotation on
     //horizontal line from rear axle.
@@ -39,11 +50,5 @@ void CarModel::updateModel(Eigen::Vector4d orientation){
     twist.twist.twist.linear.z  = v_global(2);
     pub_velocity_.publish(twist);
 }
-
-void CarModel::set_steering_angle(float steering_angle){steering_angle_ = steering_angle;}
-
-void CarModel::set_velocity_left(float velocity_left){velocity_left_ = velocity_left;}
-
-void CarModel::set_velocity_right(float velocity_right){velocity_right_ = velocity_right;}
 
 }//namespace arc_state_estimation.

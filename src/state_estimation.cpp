@@ -32,7 +32,6 @@ float CURRENT_ARRAY_SEARCHING_WIDTH;
 float MAX_DEVIATION_FROM_TEACH_PATH;
 float MAX_ABSOLUTE_VELOCITY;
 float MAX_ORIENTATION_DIVERGENCE;
-std::string CAR_MODEL_VELOCITY_TOPIC;
 std::string PATH_NAME;
 std::string ORB_SLAM_TOPIC;
 std::string PATH_TOPIC;
@@ -45,7 +44,6 @@ std::string TRACKING_VEL_ERROR_TOPIC;
 std::string WHEEL_SENSORS_LEFT_TOPIC;
 std::string WHEEL_SENSORS_RIGHT_TOPIC;
 //Subcriber and publisher.
-ros::Subscriber car_model_sub;
 ros::Subscriber left_wheel_sub;
 ros::Subscriber orb_sub;
 ros::Subscriber right_wheel_sub;
@@ -74,7 +72,6 @@ double lin_vel;
 double calculateDistance(geometry_msgs::Pose base, geometry_msgs::Pose target);
 void closeStateEstimation();
 void initStateEstimation(ros::NodeHandle* node);
-void modelCallback(const geometry_msgs::TwistWithCovarianceStamped::ConstPtr msg);
 void odomUpdater();
 void orbslamCallback(const nav_msgs::Odometry::ConstPtr& odom_data);
 void readPathFile(const std::string teach_path_file);
@@ -104,7 +101,6 @@ int main(int argc, char** argv){
   node.getParam("/safety/MAX_ABSOLUTE_VELOCITY", MAX_ABSOLUTE_VELOCITY);
   node.getParam("/safety/MAX_DEVIATION_FROM_TEACH_PATH", MAX_DEVIATION_FROM_TEACH_PATH);
   node.getParam("/safety/MAX_ORIENTATION_DIVERGENCE", MAX_ORIENTATION_DIVERGENCE);
-  node.getParam("/topic/CAR_MODEL_VELOCITY", CAR_MODEL_VELOCITY_TOPIC);
   node.getParam("/topic/ORB_SLAM_ODOMETRY", ORB_SLAM_TOPIC);
   node.getParam("/topic/STATE", STATE_TOPIC);
   node.getParam("/topic/STATE_STEERING_ANGLE", STEERING_ANGLE_TOPIC);
@@ -164,7 +160,6 @@ void initStateEstimation(ros::NodeHandle* node){
   current_path.header.frame_id = "current_path";
   // Publisher and subscriber.
   car_model.createPublisher(node);
-  car_model_sub = node->subscribe(CAR_MODEL_VELOCITY_TOPIC, QUEUE_LENGTH, modelCallback);
   left_wheel_sub = node->subscribe(WHEEL_SENSORS_LEFT_TOPIC, QUEUE_LENGTH, velocityLeftCallback);
   orb_sub = node->subscribe(ORB_SLAM_TOPIC, QUEUE_LENGTH, orbslamCallback);
   right_wheel_sub = node->subscribe(WHEEL_SENSORS_RIGHT_TOPIC, QUEUE_LENGTH, velocityRightCallback);
@@ -176,22 +171,13 @@ void initStateEstimation(ros::NodeHandle* node){
   tracking_error_vel_pub = node->advertise<std_msgs::Float64>(TRACKING_VEL_ERROR_TOPIC, QUEUE_LENGTH); 
 }
 
-void modelCallback(const geometry_msgs::TwistWithCovarianceStamped::ConstPtr msg){
-  //Velocity out of Car Model.
-  double vel_x = msg->twist.twist.linear.x;
-  double vel_y = msg->twist.twist.linear.y;
-  double vel_z = msg->twist.twist.linear.z;
-  state.pose_diff = sqrt(vel_x*vel_x + vel_y*vel_y + vel_z*vel_z);
-  //Update state and path.
-  odomUpdater();
-}
-
 void odomUpdater(){
-  //Tf broadcasting.
+  //Updating information vectors.
   position = arc_tools::transformPointMessageToEigen(state.pose.pose.position);
   quat = arc_tools::transformQuatMessageToEigen(state.pose.pose.orientation);
+  state.pose_diff = car_model.getVelocity();
   lin_vel = state.pose_diff;
-  arc_tools::tfBroadcaster(quat, position, "odom", "vi");
+  // arc_tools::tfBroadcaster(quat, position, "odom", "vi");
   //Indexing state: if teach then iterate, if repeat search closest point.
   if(!mode) array_position += 1; 
   if(mode) array_position = searchCurrentArrayPosition();
@@ -278,7 +264,7 @@ void readPathFile(const std::string teach_path_file){
 
 void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg){
   float steering_angle = msg->data;
-  car_model.set_steering_angle(steering_angle);
+  car_model.setSteeringAngle(steering_angle);
   //Updating model.
   car_model.updateModel(quat);
 }
@@ -332,14 +318,14 @@ int searchCurrentArrayPosition(){
 
 void velocityLeftCallback(const std_msgs::Float64::ConstPtr& msg){
   float velocity_left = msg->data;
-  car_model.set_velocity_left(velocity_left);
+  car_model.setVelocityLeft(velocity_left);
   //Updating model.
   car_model.updateModel(quat);
 }
 
 void velocityRightCallback(const std_msgs::Float64::ConstPtr& msg){
   float velocity_right = msg->data;
-  car_model.set_velocity_right(velocity_right);
+  car_model.setVelocityRight(velocity_right);
   //Updating model.
   car_model.updateModel(quat);
 }

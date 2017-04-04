@@ -81,7 +81,7 @@ void stopWithReason(std::string reason);
 void velocityLeftCallback(const std_msgs::Float64::ConstPtr& msg);
 void velocityRightCallback(const std_msgs::Float64::ConstPtr& msg);
 //Init class objects.
-arc_state_estimation::CarModel car_model(DISTANCE_WHEEL_AXES, LENGTH_WHEEL_AXIS);
+arc_state_estimation::CarModel car_model;
 
 int main(int argc, char** argv){
   //Init ROS.
@@ -94,7 +94,7 @@ int main(int argc, char** argv){
   node.getParam("/sensor/CAM_INIT_QUAT_Y", CAM_INIT_QUAT_Y);
   node.getParam("/sensor/CAM_INIT_QUAT_Z", CAM_INIT_QUAT_Z);
   node.getParam("/sensor/CAM_INIT_QUAT_W", CAM_INIT_QUAT_W);
-  node.getParam("/erod/DISTANCE_WHEEL_AXES", DISTANCE_WHEEL_AXES);
+  node.getParam("/erod/DISTANCE_WHEEL_AXIS", DISTANCE_WHEEL_AXES);
   node.getParam("/erod/LENGTH_WHEEL_AXIS", LENGTH_WHEEL_AXIS);
   node.getParam("/general/QUEUE_LENGTH", QUEUE_LENGTH);
   node.getParam("/control/CURRENT_ARRAY_SEARCHING_WIDTH", CURRENT_ARRAY_SEARCHING_WIDTH);
@@ -152,6 +152,9 @@ void initStateEstimation(ros::NodeHandle* node){
       std::ofstream stream(filename_all.c_str());
       stream.close();
   }
+  //Init model.
+  car_model.setDistanceWheelAxis(DISTANCE_WHEEL_AXES);
+  car_model.setLengthWheelAxis(LENGTH_WHEEL_AXIS);
   //Init state.
   position = Eigen::Vector3d(0,0,0);
   quat = Eigen::Vector4d(0,0,0,1);

@@ -2,11 +2,9 @@
 
 namespace arc_state_estimation{
 
-CarModel::CarModel(float distance_wheels, float length_axis){
-  //Setting vehicle constants.
-  L_ = distance_wheels;
-  B_ = length_axis;
-}
+CarModel::CarModel(){}
+
+CarModel::~CarModel(){}
 
 void CarModel::createPublisher(ros::NodeHandle* node){
     std::string topic;
@@ -18,6 +16,10 @@ double CarModel::getVelocity(){
     double mean_velocity = (velocity_left_ + velocity_right_)/2.0;
     return mean_velocity;
 }
+
+void CarModel::setDistanceWheelAxis(float distance_axis){L_ = distance_axis;}
+
+void CarModel::setLengthWheelAxis(float length_axis){B_ = length_axis;}
 
 void CarModel::setSteeringAngle(float steering_angle){steering_angle_ = steering_angle;}
 
@@ -44,6 +46,7 @@ void CarModel::updateModel(Eigen::Vector4d orientation){
     Eigen::Matrix3d rotation_matrix = arc_tools::getRotationMatrix(orientation_euler);
     Eigen::Vector3d v_global = rotation_matrix * velocity_local; 
     //Publishing.
+    std::cout << v_global << std::endl;
     geometry_msgs::TwistWithCovarianceStamped twist;
     twist.twist.twist.linear.x = v_global(0);
     twist.twist.twist.linear.y  = v_global(1);

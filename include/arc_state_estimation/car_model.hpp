@@ -15,10 +15,13 @@ namespace arc_state_estimation{
 
 class CarModel{
 public:
-	CarModel(float distance_wheels, float length_axis);
+	CarModel();
+	~CarModel();	
 	void createPublisher(ros::NodeHandle* node);
 	void updateModel(Eigen::Vector4d orientation);
 	double getVelocity();
+	void setDistanceWheelAxis(float distance_axis);
+	void setLengthWheelAxis(float length_axis);
 	void setSteeringAngle(float steering_angle);
 	void setVelocityLeft(float velocity_left);
 	void setVelocityRight(float velocity_right);

@@ -46,7 +46,6 @@ void CarModel::updateModel(Eigen::Vector4d orientation){
     Eigen::Matrix3d rotation_matrix = arc_tools::getRotationMatrix(orientation_euler);
     Eigen::Vector3d v_global = rotation_matrix * velocity_local; 
     //Publishing.
-    std::cout << v_global << std::endl;
     geometry_msgs::TwistWithCovarianceStamped twist;
     twist.twist.twist.linear.x = v_global(0);
     twist.twist.twist.linear.y  = v_global(1);

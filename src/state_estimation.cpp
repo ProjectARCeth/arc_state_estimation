@@ -207,6 +207,7 @@ void odomUpdater(){
 void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
   //Position (global) out of orbslam.
   state.pose.pose.position = odom_data->pose.pose.position;
+  
   //Orientation out of orbslam.
   //only relative rotation, e.g. substract orient).
   Eigen::Vector4d quat = arc_tools::transformQuatMessageToEigen(odom_data->pose.pose.orientation);

@@ -30,6 +30,8 @@ void CarModel::setVelocityRight(float velocity_right){velocity_right_ = velocity
 void CarModel::updateModel(Eigen::Vector4d orientation){
     //Geometric calculations: Equal angular velocities and current center of rotation on
     //horizontal line from rear axle.
+    if(abs(steering_angle_) <= 0.01 && steering_angle_ >= 0) steering_angle_ = 0.01;
+    if(abs(steering_angle_) <= 0.01 && steering_angle_ < 0) steering_angle_ = -0.01;
     float R = L_ / sin(steering_angle_);
     float a = L_ / tan(steering_angle_);
     float a_l = a - B_/2;
@@ -46,7 +48,6 @@ void CarModel::updateModel(Eigen::Vector4d orientation){
     Eigen::Matrix3d rotation_matrix = arc_tools::getRotationMatrix(orientation_euler);
     Eigen::Vector3d v_global = rotation_matrix * velocity_local; 
     //Publishing.
-    std::cout << v_global << std::endl;
     geometry_msgs::TwistWithCovarianceStamped twist;
     twist.twist.twist.linear.x = v_global(0);
     twist.twist.twist.linear.y  = v_global(1);

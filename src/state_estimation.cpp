@@ -25,6 +25,7 @@ float CAM_INIT_QUAT_X;
 float CAM_INIT_QUAT_Y;
 float CAM_INIT_QUAT_W;
 float CAM_INIT_QUAT_Z;
+float DISTANCE_VI_AXLE;
 float DISTANCE_WHEEL_AXES;
 float LENGTH_WHEEL_AXIS;
 int QUEUE_LENGTH;
@@ -94,6 +95,7 @@ int main(int argc, char** argv){
   node.getParam("/sensor/CAM_INIT_QUAT_Y", CAM_INIT_QUAT_Y);
   node.getParam("/sensor/CAM_INIT_QUAT_Z", CAM_INIT_QUAT_Z);
   node.getParam("/sensor/CAM_INIT_QUAT_W", CAM_INIT_QUAT_W);
+  node.getParam("/erod/DISTANCE_VI_REAR_AXLE", DISTANCE_VI_AXLE);
   node.getParam("/erod/DISTANCE_WHEEL_AXIS", DISTANCE_WHEEL_AXES);
   node.getParam("/erod/LENGTH_WHEEL_AXIS", LENGTH_WHEEL_AXIS);
   node.getParam("/general/QUEUE_LENGTH", QUEUE_LENGTH);
@@ -205,8 +207,6 @@ void odomUpdater(){
 }
 
 void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
-  //Position (global) out of orbslam.
-  state.pose.pose.position = odom_data->pose.pose.position;
   //Orientation out of orbslam.
   //only relative rotation, e.g. substract orient).
   Eigen::Vector4d quat = arc_tools::transformQuatMessageToEigen(odom_data->pose.pose.orientation);
@@ -215,6 +215,11 @@ void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
   Eigen::Vector4d quat_init_trafo = arc_tools::diffQuaternion(quat_init, quat_init_soll);
   Eigen::Vector4d quat_diff = arc_tools::diffQuaternion(quat_init_trafo, quat); 
   state.pose.pose.orientation =  arc_tools::transformEigenToQuatMessage(quat_diff);
+  //Position (global) out of orbslam.
+  Eigen::Vector3d diff_VI_axle(0, DISTANCE_VI_AXLE,0);
+  geometry_msgs::Point diff_VI_axle_point = arc_tools::transformEigenToPointMessage(diff_VI_axle);
+  geometry_msgs::Point diff_VI_global = arc_tools::rotationLocalToGlobal(diff_VI_axle_point,state);
+  state.pose.pose.position = arc_tools::addPoints(odom_data->pose.pose.position,diff_VI_global);
   //Update state and path.
   odomUpdater();
 }

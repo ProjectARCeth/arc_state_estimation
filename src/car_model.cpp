@@ -30,28 +30,34 @@ void CarModel::setVelocityRight(float velocity_right){velocity_right_ = velocity
 void CarModel::updateModel(Eigen::Vector4d orientation){
     //Geometric calculations: Equal angular velocities and current center of rotation on
     //horizontal line from rear axle.
-    if(abs(steering_angle_) <= 0.01 && steering_angle_ >= 0) steering_angle_ = 0.01;
-    if(abs(steering_angle_) <= 0.01 && steering_angle_ < 0) steering_angle_ = -0.01;
-    float R = L_ / sin(steering_angle_);
-    float a = L_ / tan(steering_angle_);
-    float a_l = a - B_/2;
-    float a_r = a + B_/2;
-    float R_l = sqrt(a_l*a_l + L_*L_);
-    float R_r = sqrt(a_r*a_r + L_*L_);
-    float v_front_mean = velocity_left_ * R / R_l; 
-    float v_back = v_front_mean * cos(steering_angle_);
-    float omega = sin(steering_angle_) / B_;
-    //Velocities in local frame.
-    Eigen::Vector3d velocity_local(v_back, 0, 0);
-    //Convert to global frame.
-    Eigen::Vector3d orientation_euler = arc_tools::transformEulerQuaternionVector(orientation);
-    Eigen::Matrix3d rotation_matrix = arc_tools::getRotationMatrix(orientation_euler);
-    Eigen::Vector3d v_global = rotation_matrix * velocity_local; 
+    if(fabs(steering_angle_) <= 0.01 && steering_angle_ >= 0) steering_angle_ = 0.01;
+    if(fabs(steering_angle_) <= 0.01 && steering_angle_ < 0) steering_angle_ = -0.01;
+    //Find geometrics.
+    float a = fabs(L_/tan(steering_angle_));
+    float a_left = a - B_/2;
+    float a_right = a + B_/2;
+    float R = fabs(L_/sin(steering_angle_));
+    float R_left = sqrt(a_left*a_left + L_*L_);
+    float R_right = sqrt(a_right*a_right + L_*L_);
+    //Rear axis.
+    double w_left = velocity_left_/a_left;
+    double w_right = velocity_right_/a_right;
+    double w_rear = (w_left+w_right)/2;
+    //Front axis.
+    // float v_center_left = velocity_left_ * R / R_left; 
+    // float v_center_right = velocity_right_ * R / R_right; 
+    // float v_center = (v_center_right+v_center_left)/2;
+    // float w_front = fabs(sin(steering_angle_) / B_);
+    float w_front = w_rear;
+    //Get velocities.
+    double v_x = (w_rear+w_front)/2*a;
+    double v_y = (w_rear+w_front)/2*L_;
+    if(steering_angle_<0) v_y = -v_y;
     //Publishing.
     geometry_msgs::TwistWithCovarianceStamped twist;
-    twist.twist.twist.linear.x = v_global(0);
-    twist.twist.twist.linear.y  = v_global(1);
-    twist.twist.twist.linear.z  = v_global(2);
+    twist.twist.twist.linear.x = v_x;
+    twist.twist.twist.linear.y  = v_y;
+    twist.twist.twist.linear.z  = 0;
     pub_velocity_.publish(twist);
 }
 

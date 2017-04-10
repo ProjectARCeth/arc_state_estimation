@@ -316,7 +316,7 @@ int searchCurrentArrayPosition(){
   if (alpha>=MAX_ORIENTATION_DIVERGENCE) stopWithReason("orientation divergence");
   //Publish tracking error.
   std_msgs::Float64 shortest_distance_msg;
-  shortest_distance_msg.data = shortest_distance;
+  shortest_distance_msg.data = fabs(arc_tools::globalToLocal(teach_path.poses[smallest_distance_index].pose.position,state).y);
   tracking_error_pub.publish(shortest_distance_msg);
   //Publish tracking error velocity.
   std_msgs::Float64 velocity_tracking_error_msg;

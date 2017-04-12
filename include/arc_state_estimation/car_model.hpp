@@ -10,6 +10,7 @@
 #include "geometry_msgs/TwistWithCovarianceStamped.h"
 #include "geometry_msgs/Vector3.h"
 #include "std_msgs/Float64.h"
+#include <math.h>
 
 namespace arc_state_estimation{
 

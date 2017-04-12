@@ -28,31 +28,47 @@ void CarModel::setVelocityLeft(float velocity_left){velocity_left_ = velocity_le
 void CarModel::setVelocityRight(float velocity_right){velocity_right_ = velocity_right;}
 
 void CarModel::updateModel(Eigen::Vector4d orientation){
+    double v_x;
+    double v_y;
+    //std::cout << "The steering angle is " << steering_angle_ << std::endl;
     //Geometric calculations: Equal angular velocities and current center of rotation on
     //horizontal line from rear axle.
-    if(fabs(steering_angle_) <= 0.01 && steering_angle_ >= 0) steering_angle_ = 0.01;
-    if(fabs(steering_angle_) <= 0.01 && steering_angle_ < 0) steering_angle_ = -0.01;
-    //Find geometrics.
-    float a = fabs(L_/tan(steering_angle_));
-    float a_left = a - B_/2;
-    float a_right = a + B_/2;
-    float R = fabs(L_/sin(steering_angle_));
-    float R_left = sqrt(a_left*a_left + L_*L_);
-    float R_right = sqrt(a_right*a_right + L_*L_);
-    //Rear axis.
-    double w_left = velocity_left_/a_left;
-    double w_right = velocity_right_/a_right;
-    double w_rear = (w_left+w_right)/2;
-    //Front axis.
-    // float v_center_left = velocity_left_ * R / R_left; 
-    // float v_center_right = velocity_right_ * R / R_right; 
-    // float v_center = (v_center_right+v_center_left)/2;
-    // float w_front = fabs(sin(steering_angle_) / B_);
-    float w_front = w_rear;
-    //Get velocities.
-    double v_x = (w_rear+w_front)/2*a;
-    double v_y = (w_rear+w_front)/2*L_;
-    if(steering_angle_<0) v_y = -v_y;
+    if(fabs(steering_angle_) <= 0.01) {
+        v_x = (velocity_right_ + velocity_left_ ) / 2;
+        v_y = 0; 
+    }
+    
+    else { 
+        double v_rear = (velocity_right_ + velocity_left_ ) / 2;
+        double beta = M_PI / 2 - fabs(steering_angle_);
+        double r1 = L_ * tan(beta);
+        double r2 = L_ / cos(beta);
+        double w = v_rear / r1;
+        double v_front = w * r2;
+        v_x = cos(steering_angle_) * v_front;
+        v_y = sin (steering_angle_) * v_front;
+    }
+    // //Find geometrics.
+    // float a = fabs(L_/tan(steering_angle_));
+    // float a_left = a - B_/2;
+    // float a_right = a + B_/2;
+    // float R = fabs(L_/sin(steering_angle_));
+    // float R_left = sqrt(a_left*a_left + L_*L_);
+    // float R_right = sqrt(a_right*a_right + L_*L_);
+    // //Rear axis.
+    // double w_left = velocity_left_/a_left;
+    // double w_right = velocity_right_/a_right;
+    // double w_rear = (w_left+w_right)/2;
+    // //Front axis.
+    // // float v_center_left = velocity_left_ * R / R_left; 
+    // // float v_center_right = velocity_right_ * R / R_right; 
+    // // float v_center = (v_center_right+v_center_left)/2;
+    // // float w_front = fabs(sin(steering_angle_) / B_);
+    // float w_front = w_rear;
+    // //Get velocities.
+    // v_x = (w_rear+w_front)/2*a;
+    // v_y = (w_rear+w_front)/2*L_;
+    // if(steering_angle_<0) v_y = -v_y;
     //Publishing.
     geometry_msgs::TwistWithCovarianceStamped twist;
     twist.twist.twist.linear.x = v_x;

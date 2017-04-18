@@ -21,7 +21,7 @@ public:
 	void createPublisher(ros::NodeHandle* node);
 	void updateModel(Eigen::Vector4d orientation);
 	double getVelocity();
-	Eigen::Vector3d getVelocity();
+	Eigen::Vector3d getVelocityVector();
 	void setDistanceWheelAxis(float distance_axis);
 	void setLengthWheelAxis(float length_axis);
 	void setSteeringAngle(float steering_angle);

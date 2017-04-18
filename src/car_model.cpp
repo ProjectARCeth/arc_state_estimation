@@ -18,7 +18,7 @@ double CarModel::getVelocity(){
     return mean_velocity;
 }
 
-Eigen::Vector3d CarModel::getVelocity(){return car_velocity_vector_;}
+Eigen::Vector3d CarModel::getVelocityVector(){return car_velocity_vector_;}
 
 void CarModel::setDistanceWheelAxis(float distance_axis){L_ = distance_axis;}
 

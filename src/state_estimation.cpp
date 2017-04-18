@@ -67,9 +67,11 @@ std::vector<float> teach_diff_vector;
 int teach_path_length;
 //Mode: Teach () = Default or Repeat (1).
 bool mode = true; 
+bool first =true;
 //State as an Eigen::Vector.
-Eigen::Vector3d position;
-Eigen::Vector4d quat;
+Eigen::Vector3d position(0,0,0);
+Eigen::Vector4d quat(0,0,0,1);
+double lin_vel;
 //Declaration of functions.
 double calculateDistance(geometry_msgs::Pose base, geometry_msgs::Pose target);
 void closeStateEstimation();
@@ -229,16 +231,17 @@ void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
 }
 
 void rovioCallback(const nav_msgs::Odometry::ConstPtr& odom_data){
-  nav_msgs::Odometry rov_optimal;
-  rovio_optimal.pose.pose.orientation.x = odom_data.pose.pose.orientation.x;
-  rovio_optimal.pose.pose.orientation.y = odom_data.pose.pose.orientation.y;
-  rovio_optimal.pose.pose.orientation.z = odom_data.pose.pose.orientation.z;
-  rovio_optimal.pose.pose.orientation.w = odom_data.pose.pose.orientation.w;
-  Eigen::Vector3d car_model_velocity = car_model.getVelocity();
+  if (first) {odomUpdater(); first=false; std::cout << "HALLO" << std::endl;}
+  nav_msgs::Odometry rovio_optimal;
+  rovio_optimal.pose.pose.orientation.x = odom_data->pose.pose.orientation.x;
+  rovio_optimal.pose.pose.orientation.y = odom_data->pose.pose.orientation.y;
+  rovio_optimal.pose.pose.orientation.z = odom_data->pose.pose.orientation.z;
+  rovio_optimal.pose.pose.orientation.w = odom_data->pose.pose.orientation.w;
+  Eigen::Vector3d car_model_velocity = car_model.getVelocityVector();
   rovio_optimal.twist.twist.linear.x = car_model_velocity(0);
   rovio_optimal.twist.twist.linear.y = car_model_velocity(1);
   rovio_optimal.twist.twist.linear.z = car_model_velocity(2);
-  rovio_optimisation_pub.publish(rov_optimal);
+  rovio_optimisation_pub.publish(rovio_optimal);
 }
 
 void readPathFile(const std::string teach_path_file){

@@ -18,6 +18,8 @@ double CarModel::getVelocity(){
     return mean_velocity;
 }
 
+Eigen::Vector3d CarModel::getVelocity(){return car_velocity_vector_;}
+
 void CarModel::setDistanceWheelAxis(float distance_axis){L_ = distance_axis;}
 
 void CarModel::setLengthWheelAxis(float length_axis){B_ = length_axis;}
@@ -70,6 +72,10 @@ void CarModel::updateModel(Eigen::Vector4d orientation){
     // v_x = (w_rear+w_front)/2*a;
     // v_y = (w_rear+w_front)/2*L_;
     // if(steering_angle_<0) v_y = -v_y;
+    //Updating velocity vector.
+    car_velocity_vector_(0) = v_y;
+    car_velocity_vector_(1) = 0;
+    car_velocity_vector_(2) = v_x;
     //Publishing.
     geometry_msgs::TwistStamped twist;
     twist.twist.linear.x = v_y;

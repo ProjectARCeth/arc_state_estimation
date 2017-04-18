@@ -47,6 +47,7 @@ std::string WHEEL_SENSORS_RIGHT_TOPIC;
 //Subcriber and publisher.
 ros::Subscriber left_wheel_sub;
 ros::Subscriber orb_sub;
+ros::Subscriber rovio_sub;
 ros::Subscriber right_wheel_sub;
 ros::Subscriber steering_sub;
 ros::Subscriber stop_sub;
@@ -55,6 +56,7 @@ ros::Publisher state_pub;
 ros::Publisher path_teach_pub;
 ros::Publisher tracking_error_pub;
 ros::Publisher tracking_error_vel_pub;
+ros::Publisher rovio_optimisation_pub;
 //Path and output file.
 arc_msgs::State state;
 int array_position;
@@ -68,13 +70,13 @@ bool mode = true;
 //State as an Eigen::Vector.
 Eigen::Vector3d position;
 Eigen::Vector4d quat;
-double lin_vel;
 //Declaration of functions.
 double calculateDistance(geometry_msgs::Pose base, geometry_msgs::Pose target);
 void closeStateEstimation();
 void initStateEstimation(ros::NodeHandle* node);
 void odomUpdater();
 void orbslamCallback(const nav_msgs::Odometry::ConstPtr& odom_data);
+void rovioCallback(const nav_msgs::Odometry::ConstPtr& odom_data);
 void readPathFile(const std::string teach_path_file);
 int searchCurrentArrayPosition(); 
 void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg);
@@ -167,6 +169,7 @@ void initStateEstimation(ros::NodeHandle* node){
   car_model.createPublisher(node);
   left_wheel_sub = node->subscribe(WHEEL_SENSORS_LEFT_TOPIC, QUEUE_LENGTH, velocityLeftCallback);
   orb_sub = node->subscribe(ORB_SLAM_TOPIC, QUEUE_LENGTH, orbslamCallback);
+  rovio_sub = node->subscribe("rovio/odometry", QUEUE_LENGTH, rovioCallback);
   right_wheel_sub = node->subscribe(WHEEL_SENSORS_RIGHT_TOPIC, QUEUE_LENGTH, velocityRightCallback);
   steering_sub = node->subscribe(STEERING_ANGLE_TOPIC, QUEUE_LENGTH, steeringAngleCallback);
   path_pub = node->advertise<nav_msgs::Path>(PATH_TOPIC, QUEUE_LENGTH);
@@ -174,6 +177,7 @@ void initStateEstimation(ros::NodeHandle* node){
   state_pub = node->advertise<arc_msgs::State>(STATE_TOPIC, QUEUE_LENGTH);
   tracking_error_pub = node->advertise<std_msgs::Float64>(TRACKING_ERROR_TOPIC, QUEUE_LENGTH);
   tracking_error_vel_pub = node->advertise<std_msgs::Float64>(TRACKING_VEL_ERROR_TOPIC, QUEUE_LENGTH); 
+  rovio_optimisation_pub = node->advertise<nav_msgs::Odometry>("rovio_optimal", QUEUE_LENGTH);
 }
 
 void odomUpdater(){
@@ -222,6 +226,19 @@ void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
   state.pose.pose.position = arc_tools::addPoints(odom_data->pose.pose.position,diff_VI_global);
   //Update state and path.
   odomUpdater();
+}
+
+void rovioCallback(const nav_msgs::Odometry::ConstPtr& odom_data){
+  nav_msgs::Odometry rov_optimal;
+  rovio_optimal.pose.pose.orientation.x = odom_data.pose.pose.orientation.x;
+  rovio_optimal.pose.pose.orientation.y = odom_data.pose.pose.orientation.y;
+  rovio_optimal.pose.pose.orientation.z = odom_data.pose.pose.orientation.z;
+  rovio_optimal.pose.pose.orientation.w = odom_data.pose.pose.orientation.w;
+  Eigen::Vector3d car_model_velocity = car_model.getVelocity();
+  rovio_optimal.twist.twist.linear.x = car_model_velocity(0);
+  rovio_optimal.twist.twist.linear.y = car_model_velocity(1);
+  rovio_optimal.twist.twist.linear.z = car_model_velocity(2);
+  rovio_optimisation_pub.publish(rov_optimal);
 }
 
 void readPathFile(const std::string teach_path_file){

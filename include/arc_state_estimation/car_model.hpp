@@ -21,6 +21,7 @@ public:
 	void createPublisher(ros::NodeHandle* node);
 	void updateModel(Eigen::Vector4d orientation);
 	double getVelocity();
+	Eigen::Vector3d getVelocity();
 	void setDistanceWheelAxis(float distance_axis);
 	void setLengthWheelAxis(float length_axis);
 	void setSteeringAngle(float steering_angle);
@@ -35,6 +36,7 @@ private:
 	float steering_angle_;
 	float velocity_left_;
 	float velocity_right_;
+	Eigen::Vector3d car_velocity_vector_;
 };
 }//namespace arc_state_estimation.
 

@@ -7,7 +7,7 @@
 #include "Eigen/Dense"
 #include "ros/ros.h"
 
-#include "geometry_msgs/TwistWithCovarianceStamped.h"
+#include "geometry_msgs/TwistStamped.h"
 #include "geometry_msgs/Vector3.h"
 #include "std_msgs/Float64.h"
 #include <math.h>
@@ -29,6 +29,7 @@ public:
 
 private:
 	ros::Publisher pub_velocity_;
+	ros::Publisher pub_rotated_vel_;
 	float L_;
 	float B_;
 	float steering_angle_;

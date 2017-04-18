@@ -9,7 +9,8 @@ CarModel::~CarModel(){}
 void CarModel::createPublisher(ros::NodeHandle* node){
     std::string topic;
     node->getParam("/topic/CAR_MODEL_VELOCITY", topic);
-    pub_velocity_ = node->advertise<geometry_msgs::TwistWithCovarianceStamped>(topic, 10);
+    pub_velocity_ = node->advertise<geometry_msgs::TwistStamped>(topic, 10);
+    // pub_rotated_vel_ = node->advertise<geometry_msgs::TwistStamped>("rotated", 10);
 }
 
 double CarModel::getVelocity(){
@@ -70,11 +71,25 @@ void CarModel::updateModel(Eigen::Vector4d orientation){
     // v_y = (w_rear+w_front)/2*L_;
     // if(steering_angle_<0) v_y = -v_y;
     //Publishing.
-    geometry_msgs::TwistWithCovarianceStamped twist;
-    twist.twist.twist.linear.x = v_x;
-    twist.twist.twist.linear.y  = v_y;
-    twist.twist.twist.linear.z  = 0;
+    geometry_msgs::TwistStamped twist;
+    twist.twist.linear.x = v_y;
+    twist.twist.linear.y  = 0;
+    twist.twist.linear.z  = v_x;
     pub_velocity_.publish(twist);
+
+    // Eigen::Vector4d init_quat(0.78,-0.037,0.004,-0.624);
+    // Eigen::Vector3d init_euler = arc_tools::transformEulerQuaternionVector(init_quat);
+    // Eigen::Matrix3d init_rot = arc_tools::getRotationMatrix(init_euler);
+    // Eigen::Vector3d vel(v_x,v_y,0);
+    // Eigen::Vector3d rotated_vel = init_rot*vel;
+    // Eigen::Vector3d rotated_vel(v_y,0,v_x);
+    // geometry_msgs::TwistStamped rot_twist;
+    // rot_twist.twist.linear.x = rotated_vel(0);
+    // rot_twist.twist.linear.y  = rotated_vel(1);
+    // rot_twist.twist.linear.z  = rotated_vel(2);
+    // pub_rotated_vel_.publish(rot_twist);
+
+
 }
 
 }//namespace arc_state_estimation.

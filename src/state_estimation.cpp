@@ -17,6 +17,8 @@
 #include "nav_msgs/Path.h"
 #include "std_msgs/Bool.h"
 #include "std_msgs/Float64.h"
+#include "std_msgs/Time.h"
+#include "sensor_msgs/Imu.h"
 
 #include "arc_state_estimation/car_model.hpp"
 
@@ -47,20 +49,20 @@ std::string WHEEL_SENSORS_RIGHT_TOPIC;
 //Subcriber and publisher.
 ros::Subscriber left_wheel_sub;
 ros::Subscriber orb_sub;
-ros::Subscriber rovio_sub;
 ros::Subscriber right_wheel_sub;
 ros::Subscriber steering_sub;
 ros::Subscriber stop_sub;
+ros::Subscriber imu_time_sub;
 ros::Publisher path_pub;
 ros::Publisher state_pub;
 ros::Publisher path_teach_pub;
 ros::Publisher tracking_error_pub;
 ros::Publisher tracking_error_vel_pub;
-ros::Publisher rovio_optimisation_pub;
 //Path and output file.
 arc_msgs::State state;
 int array_position;
 bool stop = false;
+bool first_run=true;
 nav_msgs::Path current_path;
 nav_msgs::Path teach_path;
 std::vector<float> teach_diff_vector;
@@ -85,6 +87,7 @@ void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg);
 void stopWithReason(std::string reason);
 void velocityLeftCallback(const std_msgs::Float64::ConstPtr& msg);
 void velocityRightCallback(const std_msgs::Float64::ConstPtr& msg);
+void imuTimeCallback(const sensor_msgs::Imu::ConstPtr& msg);
 //Init class objects.
 arc_state_estimation::CarModel car_model;
 
@@ -121,7 +124,7 @@ int main(int argc, char** argv){
   //Read teach txt path file.
   if(mode) readPathFile(PATH_NAME + "_teach.txt");
   //Spinning.
-	ros::spin();
+  ros::spin();
   //Close state estimation.
   closeStateEstimation();
 	return 0;
@@ -171,15 +174,14 @@ void initStateEstimation(ros::NodeHandle* node){
   car_model.createPublisher(node);
   left_wheel_sub = node->subscribe(WHEEL_SENSORS_LEFT_TOPIC, QUEUE_LENGTH, velocityLeftCallback);
   orb_sub = node->subscribe(ORB_SLAM_TOPIC, QUEUE_LENGTH, orbslamCallback);
-  rovio_sub = node->subscribe("rovio/odometry", QUEUE_LENGTH, rovioCallback);
   right_wheel_sub = node->subscribe(WHEEL_SENSORS_RIGHT_TOPIC, QUEUE_LENGTH, velocityRightCallback);
   steering_sub = node->subscribe(STEERING_ANGLE_TOPIC, QUEUE_LENGTH, steeringAngleCallback);
+  imu_time_sub = node->subscribe("/imu0", 1, imuTimeCallback);
   path_pub = node->advertise<nav_msgs::Path>(PATH_TOPIC, QUEUE_LENGTH);
   path_teach_pub = node->advertise<nav_msgs::Path>(TEACH_PATH_TOPIC, QUEUE_LENGTH);
   state_pub = node->advertise<arc_msgs::State>(STATE_TOPIC, QUEUE_LENGTH);
   tracking_error_pub = node->advertise<std_msgs::Float64>(TRACKING_ERROR_TOPIC, QUEUE_LENGTH);
   tracking_error_vel_pub = node->advertise<std_msgs::Float64>(TRACKING_VEL_ERROR_TOPIC, QUEUE_LENGTH); 
-  rovio_optimisation_pub = node->advertise<nav_msgs::Odometry>("rovio_optimal", QUEUE_LENGTH);
 }
 
 void odomUpdater(){
@@ -215,11 +217,11 @@ void odomUpdater(){
 void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
   //Orientation out of orbslam.
   //only relative rotation, e.g. substract orient).
-  Eigen::Vector4d quat = arc_tools::transformQuatMessageToEigen(odom_data->pose.pose.orientation);
+  Eigen::Vector4d quat_orb = arc_tools::transformQuatMessageToEigen(odom_data->pose.pose.orientation);
   Eigen::Vector4d quat_init_soll(0,0,0,1);
   Eigen::Vector4d quat_init(CAM_INIT_QUAT_X, CAM_INIT_QUAT_Y, CAM_INIT_QUAT_Z, CAM_INIT_QUAT_W);
   Eigen::Vector4d quat_init_trafo = arc_tools::diffQuaternion(quat_init, quat_init_soll);
-  Eigen::Vector4d quat_diff = arc_tools::diffQuaternion(quat_init_trafo, quat); 
+  Eigen::Vector4d quat_diff = arc_tools::diffQuaternion(quat_init_trafo, quat_orb); 
   state.pose.pose.orientation =  arc_tools::transformEigenToQuatMessage(quat_diff);
   //Position (global) out of orbslam.
   Eigen::Vector3d diff_VI_AXIS(0, DISTANCE_VI_AXIS,0);
@@ -228,20 +230,6 @@ void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
   state.pose.pose.position = arc_tools::addPoints(odom_data->pose.pose.position,diff_VI_global);
   //Update state and path.
   odomUpdater();
-}
-
-void rovioCallback(const nav_msgs::Odometry::ConstPtr& odom_data){
-  if (first) {odomUpdater(); first=false; std::cout << "HALLO" << std::endl;}
-  nav_msgs::Odometry rovio_optimal;
-  rovio_optimal.pose.pose.orientation.x = odom_data->pose.pose.orientation.x;
-  rovio_optimal.pose.pose.orientation.y = odom_data->pose.pose.orientation.y;
-  rovio_optimal.pose.pose.orientation.z = odom_data->pose.pose.orientation.z;
-  rovio_optimal.pose.pose.orientation.w = odom_data->pose.pose.orientation.w;
-  Eigen::Vector3d car_model_velocity = car_model.getVelocityVector();
-  rovio_optimal.twist.twist.linear.x = car_model_velocity(0);
-  rovio_optimal.twist.twist.linear.y = car_model_velocity(1);
-  rovio_optimal.twist.twist.linear.z = car_model_velocity(2);
-  rovio_optimisation_pub.publish(rovio_optimal);
 }
 
 void readPathFile(const std::string teach_path_file){
@@ -289,6 +277,7 @@ void readPathFile(const std::string teach_path_file){
   path_teach_pub.publish(teach_path);
   //Read out path length.
   teach_path_length = i;
+  std::cout << "Teach path length:= " << teach_path_length << std::endl;
 }
 
 void steeringAngleCallback(const std_msgs::Float64::ConstPtr& msg){
@@ -308,12 +297,25 @@ int searchCurrentArrayPosition(){
   while(calculateDistance(last_pose, teach_path.poses[last_array_position+max_index].pose)
                  < CURRENT_ARRAY_SEARCHING_WIDTH){
     max_index += 1;
+    if(last_array_position+max_index>=teach_path_length-1) {
+      //std::cout<<"Unreal max_index " << last_array_position+max_index << std::endl;
+      break;
+      }
+    if(last_array_position+max_index<=0) {
+      //std::cout<<"Unreal max_index " << last_array_position+max_index << std::endl; 
+      break;
+      }
   }
   //Searching closest point.
   double shortest_distance = MAX_DEVIATION_FROM_TEACH_PATH;
   int smallest_distance_index = last_array_position;
   int lower_searching_bound = std::max(0, last_array_position-max_index);
   int upper_searching_bound = std::min(teach_path_length,last_array_position+max_index);
+  if(first_run){
+    int lower_searching_bound = 0;
+    int upper_searching_bound = teach_path_length-1;
+    first_run=false;
+  }
   for (int s = lower_searching_bound; s < upper_searching_bound; s++){
     double current_distance = calculateDistance(pose, teach_path.poses[s].pose);
     if (current_distance < shortest_distance){
@@ -348,16 +350,18 @@ int searchCurrentArrayPosition(){
 void velocityLeftCallback(const std_msgs::Float64::ConstPtr& msg){
   float velocity_left = msg->data;
   car_model.setVelocityLeft(velocity_left);
-  //Updating model.
-  car_model.updateModel(quat);
 }
 
 void velocityRightCallback(const std_msgs::Float64::ConstPtr& msg){
   float velocity_right = msg->data;
   car_model.setVelocityRight(velocity_right);
-  //Updating model.
-  car_model.updateModel(quat);
 }
+
+void imuTimeCallback(const sensor_msgs::Imu::ConstPtr& msg){
+  car_model.setTime(msg->header.stamp);
+  //std::cout << "Time : " << msg->header.stamp.toSec() << std::endl;
+}
+
 
 void stopWithReason(std::string reason){
   stop = true;

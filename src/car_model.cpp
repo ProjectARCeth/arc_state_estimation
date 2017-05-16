@@ -74,14 +74,19 @@ void CarModel::updateModel(Eigen::Vector4d orientation){
     // if(steering_angle_<0) v_y = -v_y;
     //Updating velocity vector.
     car_velocity_vector_(0) = v_y;
-    car_velocity_vector_(1) = 0;
-    car_velocity_vector_(2) = v_x;
+    car_velocity_vector_(1) = 0.1908*v_x;
+    car_velocity_vector_(2) = 0.981627*v_x;
     //Publishing.
     geometry_msgs::TwistStamped twist;
-    twist.twist.linear.x = v_y;
-    twist.twist.linear.y  = 0;
-    twist.twist.linear.z  = v_x;
+    //twist.twist.linear.x = car_velocity_vector_(0);
+    //twist.twist.linear.y  = car_velocity_vector_(1);
+    //twist.twist.linear.z  = car_velocity_vector_(2);
+    twist.header.stamp = time_stamp_;
+    twist.twist.linear.x = car_velocity_vector_(0);
+    twist.twist.linear.y  = car_velocity_vector_(1);
+    twist.twist.linear.z  = car_velocity_vector_(2);
     pub_velocity_.publish(twist);
+    usleep(100000);    
 
     // Eigen::Vector4d init_quat(0.78,-0.037,0.004,-0.624);
     // Eigen::Vector3d init_euler = arc_tools::transformEulerQuaternionVector(init_quat);
@@ -96,6 +101,10 @@ void CarModel::updateModel(Eigen::Vector4d orientation){
     // pub_rotated_vel_.publish(rot_twist);
 
 
+}
+
+void CarModel::setTime(ros::Time time_stamp){
+    time_stamp_ = time_stamp;
 }
 
 }//namespace arc_state_estimation.

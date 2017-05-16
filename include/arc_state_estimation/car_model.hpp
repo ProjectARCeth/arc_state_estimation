@@ -27,6 +27,7 @@ public:
 	void setSteeringAngle(float steering_angle);
 	void setVelocityLeft(float velocity_left);
 	void setVelocityRight(float velocity_right);
+	void setTime(ros::Time time_stamp);
 
 private:
 	ros::Publisher pub_velocity_;
@@ -37,6 +38,7 @@ private:
 	float velocity_left_;
 	float velocity_right_;
 	Eigen::Vector3d car_velocity_vector_;
+	ros::Time time_stamp_;
 };
 }//namespace arc_state_estimation.
 

@@ -2,48 +2,94 @@
 
 namespace arc_state_estimation{
 
-CarModel::CarModel(float distance_wheels, float length_axis){
-  //Setting vehicle constants.
-  L_ = distance_wheels;
-  B_ = length_axis;
-}
+CarModel::CarModel(){}
+
+CarModel::~CarModel(){}
 
 void CarModel::createPublisher(ros::NodeHandle* node){
     std::string topic;
     node->getParam("/topic/CAR_MODEL_VELOCITY", topic);
-    pub_velocity_ = node->advertise<geometry_msgs::TwistWithCovarianceStamped>(topic, 10);
+    pub_velocity_ = node->advertise<geometry_msgs::TwistStamped>(topic, 10);
+    // pub_rotated_vel_ = node->advertise<geometry_msgs::TwistStamped>("rotated", 10);
 }
+
+double CarModel::getVelocity(){
+    double mean_velocity = (velocity_left_ + velocity_right_)/2.0;
+    return mean_velocity;
+}
+
+void CarModel::setDistanceWheelAxis(float distance_axis){L_ = distance_axis;}
+
+void CarModel::setLengthWheelAxis(float length_axis){B_ = length_axis;}
+
+void CarModel::setSteeringAngle(float steering_angle){steering_angle_ = steering_angle;}
+
+void CarModel::setVelocityLeft(float velocity_left){velocity_left_ = velocity_left;}
+
+void CarModel::setVelocityRight(float velocity_right){velocity_right_ = velocity_right;}
 
 void CarModel::updateModel(Eigen::Vector4d orientation){
+    double v_x;
+    double v_y;
+    //std::cout << "The steering angle is " << steering_angle_ << std::endl;
     //Geometric calculations: Equal angular velocities and current center of rotation on
     //horizontal line from rear axle.
-    float R = L_ / sin(steering_angle_);
-    float a = L_ / tan(steering_angle_);
-    float a_l = a - B_/2;
-    float a_r = a + B_/2;
-    float R_l = sqrt(a_l*a_l + L_*L_);
-    float R_r = sqrt(a_r*a_r + L_*L_);
-    float v_front_mean = velocity_left_ * R / R_l; 
-    float v_back = v_front_mean * cos(steering_angle_);
-    float omega = sin(steering_angle_) / B_;
-    //Velocities in local frame.
-    Eigen::Vector3d velocity_local(v_back, 0, 0);
-    //Convert to global frame.
-    Eigen::Vector3d orientation_euler = arc_tools::transformEulerQuaternionVector(orientation);
-    Eigen::Matrix3d rotation_matrix = arc_tools::getRotationMatrix(orientation_euler);
-    Eigen::Vector3d v_global = rotation_matrix * velocity_local; 
+    if(fabs(steering_angle_) <= 0.01) {
+        v_x = (velocity_right_ + velocity_left_ ) / 2;
+        v_y = 0; 
+    }
+    
+    else { 
+        double v_rear = (velocity_right_ + velocity_left_ ) / 2;
+        double beta = M_PI / 2 - fabs(steering_angle_);
+        double r1 = L_ * tan(beta);
+        double r2 = L_ / cos(beta);
+        double w = v_rear / r1;
+        double v_front = w * r2;
+        v_x = cos(steering_angle_) * v_front;
+        v_y = sin (steering_angle_) * v_front;
+    }
+    // //Find geometrics.
+    // float a = fabs(L_/tan(steering_angle_));
+    // float a_left = a - B_/2;
+    // float a_right = a + B_/2;
+    // float R = fabs(L_/sin(steering_angle_));
+    // float R_left = sqrt(a_left*a_left + L_*L_);
+    // float R_right = sqrt(a_right*a_right + L_*L_);
+    // //Rear axis.
+    // double w_left = velocity_left_/a_left;
+    // double w_right = velocity_right_/a_right;
+    // double w_rear = (w_left+w_right)/2;
+    // //Front axis.
+    // // float v_center_left = velocity_left_ * R / R_left; 
+    // // float v_center_right = velocity_right_ * R / R_right; 
+    // // float v_center = (v_center_right+v_center_left)/2;
+    // // float w_front = fabs(sin(steering_angle_) / B_);
+    // float w_front = w_rear;
+    // //Get velocities.
+    // v_x = (w_rear+w_front)/2*a;
+    // v_y = (w_rear+w_front)/2*L_;
+    // if(steering_angle_<0) v_y = -v_y;
     //Publishing.
-    geometry_msgs::TwistWithCovarianceStamped twist;
-    twist.twist.twist.linear.x = v_global(0);
-    twist.twist.twist.linear.y  = v_global(1);
-    twist.twist.twist.linear.z  = v_global(2);
+    geometry_msgs::TwistStamped twist;
+    twist.twist.linear.x = v_y;
+    twist.twist.linear.y  = 0;
+    twist.twist.linear.z  = v_x;
     pub_velocity_.publish(twist);
+
+    // Eigen::Vector4d init_quat(0.78,-0.037,0.004,-0.624);
+    // Eigen::Vector3d init_euler = arc_tools::transformEulerQuaternionVector(init_quat);
+    // Eigen::Matrix3d init_rot = arc_tools::getRotationMatrix(init_euler);
+    // Eigen::Vector3d vel(v_x,v_y,0);
+    // Eigen::Vector3d rotated_vel = init_rot*vel;
+    // Eigen::Vector3d rotated_vel(v_y,0,v_x);
+    // geometry_msgs::TwistStamped rot_twist;
+    // rot_twist.twist.linear.x = rotated_vel(0);
+    // rot_twist.twist.linear.y  = rotated_vel(1);
+    // rot_twist.twist.linear.z  = rotated_vel(2);
+    // pub_rotated_vel_.publish(rot_twist);
+
+
 }
-
-void CarModel::set_steering_angle(float steering_angle){steering_angle_ = steering_angle;}
-
-void CarModel::set_velocity_left(float velocity_left){velocity_left_ = velocity_left;}
-
-void CarModel::set_velocity_right(float velocity_right){velocity_right_ = velocity_right;}
 
 }//namespace arc_state_estimation.

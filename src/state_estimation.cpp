@@ -212,6 +212,8 @@ void odomUpdater(){
            quat(0)<<" "<<quat(1)<<" "<<quat(2)<<" "<<quat(3)<<" "<<
            lin_vel <<" "<<stop<<"|";
   stream.close();
+  //Stop programm automatically at end of path.
+  if(array_position >= teach_path_length - 10) closeStateEstimation();
 }
 
 void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
@@ -301,16 +303,12 @@ int searchCurrentArrayPosition(){
       //std::cout<<"Unreal max_index " << last_array_position+max_index << std::endl;
       break;
       }
-    if(last_array_position+max_index<=0) {
-      //std::cout<<"Unreal max_index " << last_array_position+max_index << std::endl; 
-      break;
-      }
   }
   //Searching closest point.
   double shortest_distance = MAX_DEVIATION_FROM_TEACH_PATH;
   int smallest_distance_index = last_array_position;
   int lower_searching_bound = std::max(0, last_array_position-max_index);
-  int upper_searching_bound = std::min(teach_path_length,last_array_position+max_index);
+  int upper_searching_bound = std::min(teach_path_length - 1,last_array_position+max_index);
   if(first_run){
     int lower_searching_bound = 0;
     int upper_searching_bound = teach_path_length-1;
@@ -334,7 +332,7 @@ int searchCurrentArrayPosition(){
   float current_orientation = arc_tools::transformEulerQuaternionVector(quat)(2);
   Eigen::Vector4d path_quat = arc_tools::transformQuatMessageToEigen(teach_path.poses[smallest_distance_index].pose.orientation);
   float path_orientation = arc_tools::transformEulerQuaternionVector(path_quat)(2);
-  float alpha=abs(current_orientation - path_orientation);
+  float alpha=fabs(current_orientation - path_orientation);
   if (alpha>=MAX_ORIENTATION_DIVERGENCE) stopWithReason("orientation divergence");
   //Publish tracking error.
   std_msgs::Float64 shortest_distance_msg;
@@ -342,7 +340,7 @@ int searchCurrentArrayPosition(){
   tracking_error_pub.publish(shortest_distance_msg);
   //Publish tracking error velocity.
   std_msgs::Float64 velocity_tracking_error_msg;
-  velocity_tracking_error_msg.data = abs(v_teach - lin_vel);
+  velocity_tracking_error_msg.data = fabs(v_teach - lin_vel);
   tracking_error_vel_pub.publish(velocity_tracking_error_msg);
   return smallest_distance_index;
 }
@@ -361,7 +359,6 @@ void imuTimeCallback(const sensor_msgs::Imu::ConstPtr& msg){
   car_model.setTime(msg->header.stamp);
   //std::cout << "Time : " << msg->header.stamp.toSec() << std::endl;
 }
-
 
 void stopWithReason(std::string reason){
   stop = true;

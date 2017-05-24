@@ -213,7 +213,7 @@ void odomUpdater(){
            lin_vel <<" "<<stop<<"|";
   stream.close();
   //Stop programm automatically at end of path.
-  if(array_position >= teach_path_length - 10 && mode) closeStateEstimation();
+  if(array_position >= teach_path_length - 5 && mode) closeStateEstimation();
 }
 
 void orbslamCallback(const nav_msgs::Odometry::ConstPtr & odom_data){
